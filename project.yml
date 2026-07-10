@@ -1,0 +1,36 @@
+name: MenubarHide
+options:
+  bundleIdPrefix: com.sparrow
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: "Q9KN4S5XHY"
+
+targets:
+  MenubarHide:
+    type: application
+    platform: macOS
+    sources:
+      - path: MenubarHide
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sparrow.menubarhide
+        GENERATE_INFOPLIST_FILE: true
+        # ponytail: sem sandbox = uso proprio via Developer ID, CGEvent/ScreenCaptureKit na fase 2
+        ENABLE_APP_SANDBOX: "NO"
+        ENABLE_HARDENED_RUNTIME: "NO"
+        # menu bar only: sem icone no Dock
+        INFOPLIST_KEY_LSUIElement: true
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
