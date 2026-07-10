@@ -1,0 +1,5 @@
+# XcodeGen gera o .xcodeproj
+*.xcodeproj
+.DS_Store
+build/
+DerivedData/
