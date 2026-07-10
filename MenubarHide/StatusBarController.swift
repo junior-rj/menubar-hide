@@ -7,10 +7,18 @@ final class StatusBarController {
     // status item to its left off-screen. Never use isVisible — removing an
     // item loses its autosaved position.
     private static let collapsedLength: CGFloat = 10_000
+    private static let showInPanelKey = "showInPanel"
 
     private let toggleItem: NSStatusItem
     private let separatorItem: NSStatusItem
+    private let panel = HiddenItemsPanel()
+    private var autoCollapseMonitor: Any?
     private(set) var isCollapsed = false
+
+    private var showInPanel: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.showInPanelKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.showInPanelKey) }
+    }
 
     init() {
         // Creation order matters on first launch: new items enter on the left,
@@ -31,19 +39,30 @@ final class StatusBarController {
     }
 
     func toggle() {
-        isCollapsed ? expand() : collapse()
+        if showInPanel, isCollapsed {
+            panel.isVisible ? panel.close() : openPanel()
+        } else {
+            isCollapsed ? expand() : collapse()
+        }
     }
 
     private func collapse() {
+        panel.close()
         separatorItem.length = Self.collapsedLength
         isCollapsed = true
-        toggleItem.button?.image = symbol("chevron.left")
+        updateChevron()
     }
 
     private func expand() {
+        panel.close()
         separatorItem.length = NSStatusItem.variableLength
         isCollapsed = false
-        toggleItem.button?.image = symbol("chevron.right")
+        updateChevron()
+    }
+
+    private func updateChevron() {
+        let name = isCollapsed ? (showInPanel ? "chevron.down" : "chevron.left") : "chevron.right"
+        toggleItem.button?.image = symbol(name)
     }
 
     private func symbol(_ name: String) -> NSImage? {
@@ -53,22 +72,94 @@ final class StatusBarController {
     }
 
     @objc private func toggleClicked() {
-        if NSApp.currentEvent?.type == .rightMouseUp {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
             showMenu()
+        } else if event?.modifierFlags.contains(.option) == true {
+            // option-click always toggles laterally — needed to rearrange
+            // icons with cmd-drag even in panel mode
+            isCollapsed ? expand() : collapse()
         } else {
             toggle()
         }
+    }
+
+    // MARK: - Panel (Ice Bar technique)
+
+    private func openPanel() {
+        guard ItemCapturer.hasPermission() else {
+            ItemCapturer.requestPermission()
+            return
+        }
+        // Threshold: anything whose right edge is left of the expanded
+        // separator's left edge is hidden. X is identical in AppKit and CG
+        // global coordinates, only Y flips.
+        let thresholdX = (separatorItem.button?.window?.frame.minX ?? 0) + 1
+        let anchorFrame = toggleItem.button?.window?.frame ?? .zero
+        Task { @MainActor in
+            let windows = MenuBarItemScanner.hiddenItems(
+                leftOf: thresholdX,
+                excluding: ProcessInfo.processInfo.processIdentifier)
+            let items = await ItemCapturer.capture(windows)
+            panel.show(items: items, below: anchorFrame) { [weak self] item in
+                self?.forwardClick(to: item)
+            }
+        }
+    }
+
+    private func forwardClick(to item: CapturedItem) {
+        guard ClickForwarder.ensureAccessibility() else { return }
+        expand()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300)) // let the bar relayout
+            guard let frame = MenuBarItemScanner.frame(of: item.id), frame.minX >= 0 else {
+                // still off-screen (e.g. behind the notch): stay expanded
+                return
+            }
+            ClickForwarder.postClick(at: CGPoint(x: frame.midX, y: frame.midY))
+            armAutoCollapse()
+        }
+    }
+
+    /// Re-collapse after the forwarded click's interaction ends (the next
+    /// real click anywhere, usually dismissing the item's menu).
+    /// ponytail: submenus need a second click-cycle; 15s fallback covers it.
+    private func armAutoCollapse() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400)) // skip our synthetic click
+            guard let self, !self.isCollapsed, self.autoCollapseMonitor == nil else { return }
+            self.autoCollapseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
+                MainActor.assumeIsolated { self.finishAutoCollapse() }
+            }
+            try? await Task.sleep(for: .seconds(15))
+            self.finishAutoCollapse()
+        }
+    }
+
+    private func finishAutoCollapse() {
+        guard let monitor = autoCollapseMonitor else { return }
+        NSEvent.removeMonitor(monitor)
+        autoCollapseMonitor = nil
+        if !isCollapsed { collapse() }
     }
 
     // MARK: - Right-click menu
 
     private func showMenu() {
         let menu = NSMenu()
+
+        let panelItem = NSMenuItem(title: "Show Hidden Icons in Panel",
+                                   action: #selector(togglePanelMode), keyEquivalent: "")
+        panelItem.target = self
+        panelItem.state = showInPanel ? .on : .off
+        menu.addItem(panelItem)
+
         let loginItem = NSMenuItem(title: "Launch at Login",
                                    action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.target = self
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(loginItem)
+
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit MenubarHide",
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -77,6 +168,11 @@ final class StatusBarController {
         toggleItem.menu = menu
         toggleItem.button?.performClick(nil)
         toggleItem.menu = nil
+    }
+
+    @objc private func togglePanelMode() {
+        showInPanel.toggle()
+        updateChevron()
     }
 
     @objc private func toggleLaunchAtLogin() {
