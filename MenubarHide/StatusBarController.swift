@@ -21,6 +21,18 @@ final class StatusBarController {
     }
 
     init() {
+        // Two macOS 26 quirks force us to pin positions on EVERY launch:
+        // 1. On a full menu bar new items are parked off-screen (x ≈ -4220).
+        // 2. Collapsing scrambles the saved positions, swapping the order, so
+        //    the next launch would put the separator right of the chevron and
+        //    push the chevron itself off-screen.
+        // Larger value = further left, so separator (265) sits left of the
+        // chevron (250). ponytail: user drags of our two items don't persist
+        // across launches; revisit if that ever matters.
+        let defaults = UserDefaults.standard
+        defaults.set(250, forKey: "NSStatusItem Preferred Position menubarhide_toggle")
+        defaults.set(265, forKey: "NSStatusItem Preferred Position menubarhide_separator")
+
         // Creation order matters on first launch: new items enter on the left,
         // so create the chevron first (rightmost), then the separator.
         toggleItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -35,7 +47,14 @@ final class StatusBarController {
         }
         separatorItem.button?.image = symbol("line.diagonal")
 
-        collapse()
+        // Start expanded and collapse after the first layout settles — an
+        // immediate collapse is what scrambles the saved positions above.
+        updateChevron()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let self, !self.isCollapsed else { return }
+            self.collapse()
+        }
     }
 
     func toggle() {
@@ -91,15 +110,9 @@ final class StatusBarController {
             ItemCapturer.requestPermission()
             return
         }
-        // Threshold: anything whose right edge is left of the expanded
-        // separator's left edge is hidden. X is identical in AppKit and CG
-        // global coordinates, only Y flips.
-        let thresholdX = (separatorItem.button?.window?.frame.minX ?? 0) + 1
         let anchorFrame = toggleItem.button?.window?.frame ?? .zero
         Task { @MainActor in
-            let windows = MenuBarItemScanner.hiddenItems(
-                leftOf: thresholdX,
-                excluding: ProcessInfo.processInfo.processIdentifier)
+            let windows = MenuBarItemScanner.hiddenItems()
             let items = await ItemCapturer.capture(windows)
             panel.show(items: items, below: anchorFrame) { [weak self] item in
                 self?.forwardClick(to: item)

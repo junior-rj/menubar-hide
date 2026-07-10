@@ -15,7 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkey: HotkeyManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("menubar-hide: applicationDidFinishLaunching")
         let statusBar = StatusBarController()
+        NSLog("menubar-hide: StatusBarController created")
         self.statusBar = statusBar
         hotkey = HotkeyManager { statusBar.toggle() }
     }

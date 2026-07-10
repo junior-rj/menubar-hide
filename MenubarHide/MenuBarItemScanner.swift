@@ -12,30 +12,51 @@ struct CapturedItem: Identifiable {
     var id: CGWindowID { window.id }
 }
 
+// On macOS 26 status item windows are hosted by Control Center (owner name
+// and pid are useless for identifying whose icon it is), and the window
+// server clamps our 10000pt separator to ~5000pt. So discovery is by shape:
+// find the huge separator window, then take the contiguous run of icons
+// sitting immediately left of it.
 enum MenuBarItemScanner {
-    /// Status items pushed off-screen by the expanded separator: every status
-    /// window whose right edge sits left of the separator window's left edge.
-    /// ponytail: assumes hidden items live left of the main display; exotic
-    /// multi-display layouts are excluded by the threshold being ~-9970.
-    static func hiddenItems(leftOf thresholdX: CGFloat, excluding pid: pid_t) -> [MenuBarItemWindow] {
-        statusWindows(excluding: pid)
-            .filter { $0.frame.maxX <= thresholdX }
-            .sorted { $0.frame.minX < $1.frame.minX }
+    /// ponytail: 2500 clears real icons and full-bar overlays like NotchNook
+    /// (<= screen width) while matching the clamped separator (~5016).
+    private static let separatorMinWidth: CGFloat = 2_500
+
+    static func hiddenItems() -> [MenuBarItemWindow] {
+        let windows = statusWindows()
+        // our collapsed separator on the main menu bar = the rightmost huge
+        // status window (a second display's bar has its own copy further left)
+        guard let separator = windows
+            .filter({ $0.frame.width >= separatorMinWidth })
+            .max(by: { $0.frame.minX < $1.frame.minX })
+        else { return [] }
+
+        // walk leftwards from the separator's left edge; the hidden icons are
+        // contiguous, so a big gap means we reached the second display's copies
+        var result: [MenuBarItemWindow] = []
+        var edge = separator.frame.minX
+        let candidates = windows
+            .filter { $0.frame.maxX <= separator.frame.minX + 1 && $0.frame.width < separatorMinWidth }
+            .sorted { $0.frame.maxX > $1.frame.maxX }
+        for window in candidates {
+            guard edge - window.frame.maxX <= 50 else { break }
+            result.append(window)
+            edge = window.frame.minX
+        }
+        return result.sorted { $0.frame.minX < $1.frame.minX }
     }
 
     static func frame(of windowID: CGWindowID) -> CGRect? {
-        statusWindows(excluding: nil).first { $0.id == windowID }?.frame
+        statusWindows().first { $0.id == windowID }?.frame
     }
 
-    private static func statusWindows(excluding pid: pid_t?) -> [MenuBarItemWindow] {
+    private static func statusWindows() -> [MenuBarItemWindow] {
         guard let list = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
         let statusLayer = Int(CGWindowLevelForKey(.statusWindow))
         return list.compactMap { info in
             guard let layer = info[kCGWindowLayer as String] as? Int, layer == statusLayer,
-                  let ownerPID = info[kCGWindowOwnerPID as String] as? Int,
-                  ownerPID != pid.map(Int.init),
                   let windowID = info[kCGWindowNumber as String] as? CGWindowID,
                   let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: boundsDict),
