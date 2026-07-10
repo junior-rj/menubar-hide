@@ -29,7 +29,8 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         # ponytail: sem sandbox = uso proprio via Developer ID, CGEvent/ScreenCaptureKit na fase 2
         ENABLE_APP_SANDBOX: "NO"
-        ENABLE_HARDENED_RUNTIME: "NO"
+        # notarizacao exige hardened runtime; nao conflita com CGEvent/captura (sao TCC)
+        ENABLE_HARDENED_RUNTIME: "YES"
         # menu bar only: sem icone no Dock
         INFOPLIST_KEY_LSUIElement: true
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
