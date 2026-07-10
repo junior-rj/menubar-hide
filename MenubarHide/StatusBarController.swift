@@ -113,7 +113,21 @@ final class StatusBarController {
         let anchorFrame = toggleItem.button?.window?.frame ?? .zero
         Task { @MainActor in
             let windows = MenuBarItemScanner.hiddenItems()
-            let items = await ItemCapturer.capture(windows)
+            NSLog("menubar-hide: scanner found \(windows.count) hidden items")
+            var items = await ItemCapturer.capture(windows)
+            if items.count < windows.count, isCollapsed {
+                // flash-expand: neither capture API renders off-screen windows,
+                // so briefly bring the icons back, capture, hide again
+                NSLog("menubar-hide: flash-expand to capture \(windows.count - items.count) missing")
+                let captured = Set(items.map(\.id))
+                let missing = windows.filter { !captured.contains($0.id) }
+                separatorItem.length = NSStatusItem.variableLength
+                try? await Task.sleep(for: .milliseconds(300))
+                items += await ItemCapturer.capture(missing)
+                separatorItem.length = Self.collapsedLength
+                items.sort { $0.window.frame.minX < $1.window.frame.minX }
+            }
+            NSLog("menubar-hide: showing panel with \(items.count) items")
             panel.show(items: items, below: anchorFrame) { [weak self] item in
                 self?.forwardClick(to: item)
             }

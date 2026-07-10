@@ -14,22 +14,45 @@ enum ItemCapturer {
     }
 
     static func capture(_ windows: [MenuBarItemWindow]) async -> [CapturedItem] {
-        guard let content = try? await SCShareableContent
-            .excludingDesktopWindows(false, onScreenWindowsOnly: false) else { return [] }
+        let content: SCShareableContent
+        do {
+            content = try await SCShareableContent
+                .excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        } catch {
+            NSLog("menubar-hide: SCShareableContent failed: \(error)")
+            return []
+        }
+        NSLog("menubar-hide: capturing \(windows.count) windows, shareable has \(content.windows.count)")
         let scale = NSScreen.main?.backingScaleFactor ?? 2
 
         var items: [CapturedItem] = []
         for window in windows {
-            guard let scWindow = content.windows.first(where: { $0.windowID == window.id }) else { continue }
+            // legacy API first: unlike ScreenCaptureKit it can render windows
+            // that are currently off-screen (SCK fails with -3811 on those)
+            if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow,
+                                                     window.id, [.boundsIgnoreFraming, .bestResolution]) {
+                NSLog("menubar-hide: legacy capture of \(window.id) ok")
+                items.append(CapturedItem(window: window,
+                                          image: NSImage(cgImage: cgImage, size: window.frame.size)))
+                continue
+            }
+            guard let scWindow = content.windows.first(where: { $0.windowID == window.id }) else {
+                NSLog("menubar-hide: window \(window.id) not in shareable content")
+                continue
+            }
             let config = SCStreamConfiguration()
             config.width = Int(window.frame.width * scale)
             config.height = Int(window.frame.height * scale)
             config.showsCursor = false
             let filter = SCContentFilter(desktopIndependentWindow: scWindow)
-            guard let cgImage = try? await SCScreenshotManager
-                .captureImage(contentFilter: filter, configuration: config) else { continue }
-            items.append(CapturedItem(window: window,
-                                      image: NSImage(cgImage: cgImage, size: window.frame.size)))
+            do {
+                let cgImage = try await SCScreenshotManager
+                    .captureImage(contentFilter: filter, configuration: config)
+                items.append(CapturedItem(window: window,
+                                          image: NSImage(cgImage: cgImage, size: window.frame.size)))
+            } catch {
+                NSLog("menubar-hide: capture of \(window.id) failed: \(error)")
+            }
         }
         return items
     }
