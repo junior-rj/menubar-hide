@@ -20,7 +20,7 @@ Interno
 - Permissões do painel: Gravação de Tela (capturar) e Acessibilidade (encaminhar clique). Gravação de Tela exige relançar o app após conceder
 - Autostart via SMAppService.mainApp (padrão do yourlaunch com .mainApp no lugar de .daemon)
 - Projeto via XcodeGen (project.yml fonte de verdade, .xcodeproj gitignored, rodar `xcodegen` após mudar)
-- Repo: https://github.com/junior-rj/menubar-hide (privado)
+- Repo: https://github.com/junior-rj/menubar-hide (público, MIT, release com DMG notarizado)
 - Seguir a skill ios-swift-guidelines
 - Sem prazo definido
 
