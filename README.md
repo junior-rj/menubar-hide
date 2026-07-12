@@ -17,6 +17,11 @@
 
 ---
 
+<p align="center">
+  <img src="docs/screenshot-panel.png" alt="Hidden icons shown in a floating panel below the menu bar" width="900">
+  <br><sub>Panel mode: the hidden icons live in a floating panel below the menu bar — out of the notch's reach</sub>
+</p>
+
 ## Why
 
 Menu bar managers usually reveal hidden icons *sideways*. On a MacBook with a notch and a crowded menu bar, that doesn't work: macOS simply refuses to draw the icons that don't fit next to the notch — they stay invisible.
@@ -25,6 +30,11 @@ MenubarHide offers both modes:
 
 - **Sideways** (classic): a separator expands to push icons off-screen, one click brings them back.
 - **Panel** (notch-friendly): hidden icons appear in a floating panel **below** the menu bar. Every icon is always visible and clickable, no matter how full the bar is.
+
+<p align="center">
+  <img src="docs/screenshot-expanded.png" alt="Menu bar expanded, revealing the hidden icons left of the # separator" width="900">
+  <br><sub>Sideways mode expanded: the icons you chose to hide sit left of the <code>#</code>; the <code>−</code> collapses them again</sub>
+</p>
 
 Tested and battle-hardened on **macOS 26 Tahoe**, which broke several assumptions older menu bar managers rely on (see [How it works](#how-it-works)).
 
