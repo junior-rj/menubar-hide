@@ -32,8 +32,15 @@ Interno
 - MenubarHide/ItemCapturer.swift — captura via ScreenCaptureKit
 - MenubarHide/HiddenItemsPanel.swift — NSPanel + SwiftUI com os ícones
 - MenubarHide/ClickForwarder.swift — clique sintético via CGEvent
+- scripts/release.sh — DMG assinado (Developer ID) e notarizado, perfil de notary do time (yourlaunch-notary)
 
 ## Regras específicas
-- Ordem de criação dos NSStatusItem só vale no primeiro launch; se as posições bagunçarem no dev: `defaults delete com.sparrow.menubarhide`
+- Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
+  - Menu bar cheia estaciona itens novos fora da tela; as posições preferidas são fixadas via UserDefaults a cada launch, e o collapse inicial é adiado 500ms (recolher cedo embaralha as posições salvas)
+  - As janelas dos status items pertencem ao Control Center (owner/pid inúteis); o scanner acha o separador pela forma (janela gigante, o length 10000 vem clampado ~5016)
+  - Nenhuma API captura janela fora da tela (SCK dá -3811); o painel usa flash-expand de 300ms pra capturar
 - Option-clique no chevron sempre alterna lateral (necessário pra reorganizar ícones com cmd-drag mesmo no modo painel)
+- Hardened runtime ligado (exigência da notarização); sandbox continua desligado
+- Trocar a assinatura do app instalado (dev ↔ Developer ID) invalida as permissões TCC; reconceder Gravação de Tela e Acessibilidade
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
+- Release: `./scripts/release.sh` (gera build/MenubarHide.dmg notarizado)

@@ -45,15 +45,19 @@ final class StatusBarController {
             button.action = #selector(toggleClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        separatorItem.button?.image = symbol("line.diagonal")
+        separatorItem.button?.image = symbol("number")
 
         // Start expanded and collapse after the first layout settles — an
         // immediate collapse is what scrambles the saved positions above.
-        updateChevron()
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard let self, !self.isCollapsed else { return }
-            self.collapse()
+        // Right after boot, stay expanded: menu bar apps still launching would
+        // materialize left of the huge separator and get hidden unintentionally.
+        updateToggleIcon()
+        if ProcessInfo.processInfo.systemUptime > 300 {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, !self.isCollapsed else { return }
+                self.collapse()
+            }
         }
     }
 
@@ -69,19 +73,18 @@ final class StatusBarController {
         panel.close()
         separatorItem.length = Self.collapsedLength
         isCollapsed = true
-        updateChevron()
+        updateToggleIcon()
     }
 
     private func expand() {
         panel.close()
         separatorItem.length = NSStatusItem.variableLength
         isCollapsed = false
-        updateChevron()
+        updateToggleIcon()
     }
 
-    private func updateChevron() {
-        let name = isCollapsed ? (showInPanel ? "chevron.down" : "chevron.left") : "chevron.right"
-        toggleItem.button?.image = symbol(name)
+    private func updateToggleIcon() {
+        toggleItem.button?.image = symbol(isCollapsed ? "plus" : "minus")
     }
 
     private func symbol(_ name: String) -> NSImage? {
@@ -199,7 +202,7 @@ final class StatusBarController {
 
     @objc private func togglePanelMode() {
         showInPanel.toggle()
-        updateChevron()
+        updateToggleIcon()
     }
 
     @objc private func toggleLaunchAtLogin() {
