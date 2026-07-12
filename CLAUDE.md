@@ -8,7 +8,7 @@ Interno
 
 ## Escopo
 - App novo em SwiftUI, macOS 14+ (subiu de 13 por causa do ScreenCaptureKit do painel)
-- Esconder/mostrar ícones da menu bar com um clique no chevron
+- Esconder/mostrar ícones da menu bar com um clique no botão + / − (separador é #)
 - Painel abaixo da menu bar com os ícones escondidos (modo alternável no clique-direito)
 - Atalho de teclado ⌃⌥H pra alternar; iniciar com o sistema
 
@@ -26,7 +26,7 @@ Interno
 
 ## Arquivos importantes
 - project.yml — definição do projeto (rodar xcodegen após mudar)
-- MenubarHide/StatusBarController.swift — chevron + separador, toggle, menu, launch at login, integração do painel
+- MenubarHide/StatusBarController.swift — botão +/− + separador #, toggle, menu, launch at login, integração do painel
 - MenubarHide/HotkeyManager.swift — hotkey global ⌃⌥H via Carbon
 - MenubarHide/MenuBarItemScanner.swift — descoberta dos itens escondidos via CGWindowList
 - MenubarHide/ItemCapturer.swift — captura via ScreenCaptureKit
@@ -37,9 +37,10 @@ Interno
 ## Regras específicas
 - Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
   - Menu bar cheia estaciona itens novos fora da tela; as posições preferidas são fixadas via UserDefaults a cada launch, e o collapse inicial é adiado 500ms (recolher cedo embaralha as posições salvas)
+  - Boot recente (uptime < 5 min) inicia expandido e não recolhe sozinho: apps de menu bar que sobem depois nasceriam à esquerda do separador gigante e seriam engolidos
   - As janelas dos status items pertencem ao Control Center (owner/pid inúteis); o scanner acha o separador pela forma (janela gigante, o length 10000 vem clampado ~5016)
   - Nenhuma API captura janela fora da tela (SCK dá -3811); o painel usa flash-expand de 300ms pra capturar
-- Option-clique no chevron sempre alterna lateral (necessário pra reorganizar ícones com cmd-drag mesmo no modo painel)
+- Option-clique no botão sempre alterna lateral (necessário pra reorganizar ícones com cmd-drag mesmo no modo painel)
 - Hardened runtime ligado (exigência da notarização); sandbox continua desligado
 - Trocar a assinatura do app instalado (dev ↔ Developer ID) invalida as permissões TCC; reconceder Gravação de Tela e Acessibilidade
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
