@@ -24,7 +24,10 @@ final class HotkeyManager {
         }, 1, &eventType, selfPtr, nil)
 
         let hotKeyID = EventHotKeyID(signature: OSType(0x4D42_4844), id: 1) // 'MBHD'
-        RegisterEventHotKey(UInt32(kVK_ANSI_H), UInt32(controlKey | optionKey),
-                            hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(UInt32(kVK_ANSI_H), UInt32(controlKey | optionKey),
+                                         hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        if status != noErr || hotKeyRef == nil {
+            NSLog("menubar-hide: hotkey registration failed (status \(status)) — ⌃⌥H may be taken by another app")
+        }
     }
 }

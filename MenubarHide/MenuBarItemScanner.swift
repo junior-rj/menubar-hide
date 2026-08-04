@@ -50,6 +50,13 @@ enum MenuBarItemScanner {
         statusWindows().first { $0.id == windowID }?.frame
     }
 
+    /// Fingerprint of the status-layer population (window IDs AND positions,
+    /// so a cmd-drag rearrangement in progress reads as "not settled") — used
+    /// to detect when the launch storm ended before the initial collapse.
+    static func statusItemFingerprint() -> Set<String> {
+        Set(statusWindows().map { "\($0.id)@\(Int($0.frame.minX.rounded()))" })
+    }
+
     private static func statusWindows() -> [MenuBarItemWindow] {
         guard let list = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] else {
             return []

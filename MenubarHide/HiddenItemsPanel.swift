@@ -1,5 +1,18 @@
 import SwiftUI
 
+// Borderless windows refuse key status by default; without it the panel's
+// buttons and the Esc monitor are dead. .nonactivatingPanel keeps the
+// LSUIElement app inactive while the panel is key (Spotlight-style).
+private final class ClickablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
+// The first click on a non-key window is normally consumed just to focus
+// it; accept it so a single click on an icon is enough.
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 // Floating panel just below the menu bar showing screenshots of the hidden
 // items (Ice Bar technique) — solves the notch swallowing icons on expand.
 @MainActor
@@ -13,15 +26,20 @@ final class HiddenItemsPanel {
               onClick: @escaping @MainActor (CapturedItem) -> Void) {
         close()
 
-        let hosting = NSHostingView(rootView: PanelContentView(items: items) { [weak self] item in
-            self?.close()
-            onClick(item)
+        let hosting = FirstMouseHostingView(rootView: PanelContentView(items: items) { [weak self] item in
+            NSLog("menubar-hide: panel click on item \(item.id) (\(item.window.ownerName))")
+            // next runloop turn: let the Button action return before the
+            // hosting view is torn down by close()
+            Task { @MainActor in
+                self?.close()
+                onClick(item)
+            }
         })
         hosting.setFrameSize(hosting.fittingSize)
 
-        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: hosting.frame.size),
-                            styleMask: [.borderless, .nonactivatingPanel],
-                            backing: .buffered, defer: false)
+        let panel = ClickablePanel(contentRect: NSRect(origin: .zero, size: hosting.frame.size),
+                                   styleMask: [.borderless, .nonactivatingPanel],
+                                   backing: .buffered, defer: false)
         panel.contentView = hosting
         panel.level = .statusBar
         panel.isOpaque = false
@@ -35,12 +53,18 @@ final class HiddenItemsPanel {
                     min(anchorFrame.maxX - panel.frame.width, screen.maxX - panel.frame.width - 4))
         panel.setFrameOrigin(NSPoint(x: x, y: anchorFrame.minY - panel.frame.height - 6))
         panel.orderFrontRegardless()
+        panel.makeKey() // Esc and buttons need key status; does not activate the app
         self.panel = panel
 
         // dismiss on click outside or Esc
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown],
                                                            handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.close() }
+            MainActor.assumeIsolated {
+                guard let self, let panel = self.panel else { return }
+                // clicks inside the panel belong to its buttons, not dismissal
+                if panel.frame.contains(NSEvent.mouseLocation) { return }
+                self.close()
+            }
         }) {
             monitors.append(monitor)
         }

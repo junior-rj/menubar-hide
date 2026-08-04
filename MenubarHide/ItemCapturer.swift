@@ -27,8 +27,9 @@ enum ItemCapturer {
 
         var items: [CapturedItem] = []
         for window in windows {
-            // legacy API first: unlike ScreenCaptureKit it can render windows
-            // that are currently off-screen (SCK fails with -3811 on those)
+            // legacy API first: cheaper for tiny windows. Off-screen windows
+            // fail in BOTH APIs (SCK -3811, legacy nil) — that's what the
+            // flash-expand retry in openPanel exists for
             if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow,
                                                      window.id, [.boundsIgnoreFraming, .bestResolution]) {
                 NSLog("menubar-hide: legacy capture of \(window.id) ok")

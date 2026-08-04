@@ -37,10 +37,13 @@ Interno
 
 ## Regras específicas
 - Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
-  - Menu bar cheia estaciona itens novos fora da tela; as posições preferidas são fixadas via UserDefaults a cada launch, e o collapse inicial é adiado 500ms (recolher cedo embaralha as posições salvas)
-  - Boot recente (uptime < 5 min) inicia expandido e não recolhe sozinho: apps de menu bar que sobem depois nasceriam à esquerda do separador gigante e seriam engolidos
+  - Menu bar cheia estaciona itens novos fora da tela; as posições preferidas são RE-ASSERTADAS via UserDefaults a cada launch (regravar o valor salvo, nunca sobrescrever com constante: a config de fixo/escondido É a ordem dos ícones em relação ao separador). Padrão 250/265 só no primeiro launch ou quando o par salvo está corrompido (fora de 0..10000 ou ordem trocada: separador deve ficar > toggle)
+  - Collapse inicial só depois da menu bar estabilizar: mínimo 500ms (recolher cedo embaralha as posições salvas) + polling do fingerprint (IDs+posições das janelas de status) estável por 3 polls de 2s, teto ~120s. Substituiu a guarda de uptime < 5 min, que media boot e não login (falhava com FileVault/logout) e deixava o app expandido a sessão inteira. Recolher no meio da tempestade de login engole apps que sobem tarde e corrompe as posições salvas DELES (irreversível pelo nosso lado)
   - As janelas dos status items pertencem ao Control Center (owner/pid inúteis); o scanner acha o separador pela forma (janela gigante, o length 10000 vem clampado ~5016)
-  - Nenhuma API captura janela fora da tela (SCK dá -3811); o painel usa flash-expand de 300ms pra capturar
+  - Nenhuma API captura janela fora da tela (SCK dá -3811, legado dá nil); o painel usa flash-expand de 300ms pra capturar
+- Painel clicável exige as duas subclasses em HiddenItemsPanel.swift: NSPanel com canBecomeKey=true (borderless recusa key e mata botões e Esc) + NSHostingView com acceptsFirstMouse (senão o 1º clique só foca a janela). Manter .nonactivatingPanel (app LSUIElement não ativa)
+- Clique sintético precisa de mouseEventClickState=1 (clickCount 0 é ignorado pela maioria dos status items); antes de postar, validar que o frame alvo está na faixa da menu bar de algum display (anti-spoofing de janela no status layer; display à esquerda do principal tem X negativo válido)
+- Qualquer collapse/expand desarma o auto-collapse pendente e cancela o poller inicial (stateWillChange) — monitor obsoleto dispararia no mouseUp sintético do clique seguinte
 - Option-clique no botão sempre alterna lateral (necessário pra reorganizar ícones com cmd-drag mesmo no modo painel)
 - Hardened runtime ligado (exigência da notarização); sandbox continua desligado
 - Trocar a assinatura do app instalado (dev ↔ Developer ID) invalida as permissões TCC; reconceder Gravação de Tela e Acessibilidade
