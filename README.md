@@ -42,7 +42,7 @@ Tested and battle-hardened on **macOS 26 Tahoe**, which broke several assumption
 
 Download `MenubarHide.dmg` from the [latest release](../../releases/latest), drag the app to Applications and open it. The app is signed with a Developer ID and notarized by Apple — no Gatekeeper warnings.
 
-Requires macOS 14 (Sonoma) or later. Apple Silicon.
+Requires macOS 14 (Sonoma) or later. Universal binary: Apple Silicon and Intel.
 
 ## Usage
 
@@ -108,4 +108,4 @@ Technique references: [Hidden Bar](https://github.com/dwarvesf/hidden) (MIT) for
 - **Instalar**: baixe o `MenubarHide.dmg` na [última release](../../releases/latest), arraste pra Aplicativos e abra (assinado e notarizado pela Apple).
 - **Usar**: segure **⌘** e arraste pra **esquerda** do `#` os ícones que quer esconder; clique no **+**/**−** ou use **⌃⌥H** pra alternar; clique-direito no botão pra ativar o **modo painel** e o **iniciar com o sistema**; **⌥-clique** expande lateral pra reorganizar os ícones.
 - **Permissões**: o painel pede **Gravação de Tela** (capturar a imagem dos ícones, que pertencem a outros apps — exige relançar o app após conceder) e **Acessibilidade** (encaminhar o clique pro ícone real). Nada é gravado ou armazenado; o modo lateral não pede permissão nenhuma.
-- Requer macOS 14+. Código original, MIT; técnicas estudadas no Hidden Bar e no Ice.
+- Requer macOS 14+ (binário universal: Apple Silicon e Intel). Código original, MIT; técnicas estudadas no Hidden Bar e no Ice.
