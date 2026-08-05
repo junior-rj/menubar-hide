@@ -15,6 +15,11 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
 </p>
 
+<p align="center">
+  <a href="https://www.sparrow.tec.br/menubar-hide/">Website</a> ·
+  <a href="../../releases/latest">Download</a>
+</p>
+
 ---
 
 <p align="center">
