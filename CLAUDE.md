@@ -20,7 +20,7 @@ Interno
 - Permissões do painel: Gravação de Tela (capturar) e Acessibilidade (encaminhar clique). Gravação de Tela exige relançar o app após conceder
 - Autostart via SMAppService.mainApp (padrão do yourlaunch com .mainApp no lugar de .daemon)
 - Projeto via XcodeGen (project.yml fonte de verdade, .xcodeproj gitignored, rodar `xcodegen` após mudar)
-- Repo: https://github.com/junior-rj/menubar-hide (PÚBLICO desde 2026-07-13, MIT, release v1.0.0 com DMG notarizado)
+- Repo: https://github.com/junior-rj/menubar-hide (PÚBLICO desde 2026-07-13, MIT, release v1.1.0 com DMG assinado e notarizado)
 - Divulgação: textos prontos em conteudo/menubar-hide-divulgacao.md (workspace); Homebrew só no cask oficial, quando o repo tiver ~75+ estrelas (régua de notabilidade); PRs no awesome-mac/awesome-menubar após ficar público
 - Seguir a skill ios-swift-guidelines
 - Sem prazo definido
