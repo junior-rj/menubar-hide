@@ -319,6 +319,12 @@ final class StatusBarController {
     private func showMenu() {
         let menu = NSMenu()
 
+        let aboutItem = NSMenuItem(title: "About MenubarHide",
+                                   action: #selector(openAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+        menu.addItem(.separator())
+
         let panelItem = NSMenuItem(title: "Show Hidden Icons in Panel",
                                    action: #selector(togglePanelMode), keyEquivalent: "")
         panelItem.target = self
@@ -339,6 +345,18 @@ final class StatusBarController {
         toggleItem.menu = menu
         toggleItem.button?.performClick(nil)
         toggleItem.menu = nil
+    }
+
+    @objc private func openAbout() {
+        // LSUIElement: sem ativar, o painel About abre atrás das janelas dos outros apps
+        NSApp.activate(ignoringOtherApps: true)
+        let credits = NSAttributedString(
+            string: "github.com/junior-rj/menubar-hide",
+            attributes: [
+                .link: URL(string: "https://github.com/junior-rj/menubar-hide")!,
+                .font: NSFont.systemFont(ofSize: 11),
+            ])
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 
     @objc private func togglePanelMode() {

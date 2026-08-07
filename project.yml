@@ -34,5 +34,5 @@ targets:
         # menu bar only: sem icone no Dock
         INFOPLIST_KEY_LSUIElement: true
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
-        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Sparrow. MIT License."
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
