@@ -11,6 +11,8 @@ Interno
 - Esconder/mostrar ícones da menu bar com um clique no botão + / − (separador é #)
 - Painel abaixo da menu bar com os ícones escondidos (modo alternável no clique-direito)
 - Atalho de teclado ⌃⌥H pra alternar; iniciar com o sistema
+- Arranjo dos ícones persistente: memoriza a posição de TODOS os ícones e reescreve no launch
+- Espaçamento da menu bar ajustável pelo menu (NSStatusItemSpacing/NSStatusItemSelectionPadding)
 
 ## Contexto
 - Referência de técnica lateral: https://github.com/dwarvesf/hidden (Hidden Bar, MIT). Só referência de estudo, o código aqui é novo
@@ -33,6 +35,8 @@ Interno
 - MenubarHide/ItemCapturer.swift — captura via ScreenCaptureKit
 - MenubarHide/HiddenItemsPanel.swift — NSPanel + SwiftUI com os ícones
 - MenubarHide/ClickForwarder.swift — clique sintético via CGEvent
+- MenubarHide/MenuBarArrangement.swift — snapshot e restauração das posições de todos os ícones via CFPreferences
+- MenubarHide/MenuBarSpacing.swift — leitura e escrita das duas chaves globais de espaçamento
 - scripts/release.sh — DMG assinado (Developer ID) e notarizado, perfil de notary do time (yourlaunch-notary)
 
 ## Regras específicas
@@ -41,6 +45,15 @@ Interno
   - Collapse inicial só depois da menu bar estabilizar: mínimo 500ms (recolher cedo embaralha as posições salvas) + polling do fingerprint (IDs+posições das janelas de status) estável por 3 polls de 2s, teto ~120s. Substituiu a guarda de uptime < 5 min, que media boot e não login (falhava com FileVault/logout) e deixava o app expandido a sessão inteira. Recolher no meio da tempestade de login engole apps que sobem tarde e corrompe as posições salvas DELES (irreversível pelo nosso lado)
   - As janelas dos status items pertencem ao Control Center (owner/pid inúteis); o scanner acha o separador pela forma (janela gigante, o length 10000 vem clampado ~5016)
   - Nenhuma API captura janela fora da tela (SCK dá -3811, legado dá nil); o painel usa flash-expand de 300ms pra capturar
+- Arranjo dos ícones (v1.3): a posição de cada ícone mora no domínio de preferências do app DONO dele, chave `NSStatusItem Preferred Position <autosaveName>`, legível e gravável via CFPreferences porque não há sandbox. Isso torna reparável o dano antes tido como irreversível (ícone parqueado fora da tela). Pegadinhas:
+  - `CFPreferencesCopyApplicationList` está marcada unavailable no SDK 26; enumerar domínios listando `~/Library/Preferences/*.plist` e ler/gravar via CFPreferences (mantém o cfprefsd coerente, ao contrário de mexer no plist na mão)
+  - O AppKit lê a posição preferida só quando o app cria o status item, então restaurar não move nada agora, só no próximo launch do app dono. Dizer isso na UI, não prometer efeito imediato
+  - Snapshot SEMPRE antes do collapse e nunca com `isCollapsed` true: recolher estaciona os ícones fora da tela e o macOS autossalva a posição ruim. O flash-expand do painel depende dessa mesma guarda (mexe no length sem passar por expand(), isCollapsed continua true)
+  - Merge, nunca replace: valor corrompido é descartado no capture, então substituir esqueceria o último valor bom justo quando ele importa. Domínio cujo plist sumiu (app desinstalado) sai do snapshot
+  - Custo medido do capture: 73ms frio, 2ms quente (cfprefsd cacheia). Roda inline na main de propósito, porque o collapse logo depois estragaria o que ele leria
+  - `kCGWindowName` das janelas de status entrega o autosaveName (`Item-0` pros apps que não nomeiam), mas o design não depende disso: indexa por (domínio, chave), então a ambiguidade dos `Item-0` não atrapalha
+- Espaçamento: `NSStatusItemSpacing` e `NSStatusItemSelectionPadding` no domínio global (`kCFPreferencesAnyApplication`, o mesmo que `defaults write -g`). Ler por CFPreferences, não por UserDefaults.standard, que enxergaria também um valor do próprio app. Só vale após logoff ou reinício, porque cada app lê no launch
+- Submenu com item desabilitado precisa de `autoenablesItems = false`, senão o AppKit reabilita tudo que tem target respondendo
 - Painel clicável exige as duas subclasses em HiddenItemsPanel.swift: NSPanel com canBecomeKey=true (borderless recusa key e mata botões e Esc) + NSHostingView com acceptsFirstMouse (senão o 1º clique só foca a janela). Manter .nonactivatingPanel (app LSUIElement não ativa)
 - Clique sintético precisa de mouseEventClickState=1 (clickCount 0 é ignorado pela maioria dos status items); antes de postar, validar que o frame alvo está na faixa da menu bar de algum display (anti-spoofing de janela no status layer; display à esquerda do principal tem X negativo válido)
 - Qualquer collapse/expand desarma o auto-collapse pendente e cancela o poller inicial (stateWillChange) — monitor obsoleto dispararia no mouseUp sintético do clique seguinte

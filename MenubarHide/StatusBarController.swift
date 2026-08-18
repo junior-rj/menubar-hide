@@ -15,6 +15,7 @@ final class StatusBarController {
     private var autoCollapseMonitor: Any?
     private var autoCollapseTask: Task<Void, Never>?
     private var initialCollapseTask: Task<Void, Never>?
+    private var snapshotTask: Task<Void, Never>?
     private var isOpeningPanel = false
     private(set) var isCollapsed = false
 
@@ -39,16 +40,33 @@ final class StatusBarController {
         let defaults = UserDefaults.standard
         let toggleKey = "NSStatusItem Preferred Position menubarhide_toggle"
         let separatorKey = "NSStatusItem Preferred Position menubarhide_separator"
+
+        // Everyone else's icons keep their position in THEIR app's domain, so
+        // putting the bar back the way the user arranged it means writing those
+        // positions before the owning apps register their items — which is why
+        // this runs at launch, ahead of everything else.
+        if let snapshot = MenuBarArrangement.saved() {
+            let rewritten = MenuBarArrangement.restore(snapshot)
+            NSLog("menubar-hide: restored arrangement, rewrote \(rewritten) of \(MenuBarArrangement.savedCount()) remembered positions")
+        }
+
         let storedToggle = defaults.object(forKey: toggleKey) as? Double
         let storedSeparator = defaults.object(forKey: separatorKey) as? Double
         let togglePos: Double, separatorPos: Double
         // separator must stay left of (= greater than) the chevron; a swapped
         // pair is scramble damage and re-pinning it would swallow the chevron
         // on every launch, so reset BOTH — a half-reset recreates the swap
-        if let t = storedToggle, let s = storedSeparator,
-           t > 0, s > 0, t <= 10_000, s <= 10_000, s > t {
+        if let t = storedToggle, let s = storedSeparator, Self.isSanePair(toggle: t, separator: s) {
             (togglePos, separatorPos) = (t, s)
             NSLog("menubar-hide: pinned positions toggle=\(t) separator=\(s)")
+        } else if let t = MenuBarArrangement.savedOwnPosition(toggleKey),
+                  let s = MenuBarArrangement.savedOwnPosition(separatorKey),
+                  Self.isSanePair(toggle: t, separator: s) {
+            // damaged pair, but the snapshot still holds the last sane one:
+            // prefer it over the constants, which would shift the separator and
+            // silently reclassify every icon between the two positions
+            (togglePos, separatorPos) = (t, s)
+            NSLog("menubar-hide: pinned positions from snapshot toggle=\(t) separator=\(s)")
         } else {
             (togglePos, separatorPos) = (250, 265)
             NSLog("menubar-hide: resetting positions to defaults (stored toggle=\(String(describing: storedToggle)) separator=\(String(describing: storedSeparator)))")
@@ -72,6 +90,13 @@ final class StatusBarController {
 
         updateToggleIcon()
         scheduleInitialCollapse()
+    }
+
+    /// The separator must stay left of (= greater than) the chevron, and both
+    /// must be on-screen: a parked item autosaves x ≈ -4220.
+    private static func isSanePair(toggle: Double, separator: Double) -> Bool {
+        MenuBarArrangement.isValid(toggle) && MenuBarArrangement.isValid(separator)
+            && toggle > 0 && separator > toggle
     }
 
     // Start expanded and collapse only once the menu bar population settles.
@@ -116,6 +141,10 @@ final class StatusBarController {
     }
 
     private func collapse() {
+        // Remember the arrangement BEFORE the length change: collapsing pushes
+        // the icons off-screen and macOS autosaves those parked positions, so
+        // capturing afterwards would remember the damage, not the arrangement.
+        captureArrangement(reason: "before collapse")
         stateWillChange()
         panel.close()
         separatorItem.length = Self.collapsedLength
@@ -129,6 +158,44 @@ final class StatusBarController {
         separatorItem.length = NSStatusItem.variableLength
         isCollapsed = false
         updateToggleIcon()
+        scheduleArrangementSnapshot()
+    }
+
+    /// Reads every app's stored icon position and merges it into our snapshot.
+    /// 73ms on the first call, 2ms afterwards (cfprefsd caches), so it runs
+    /// inline — it has to, since the collapse right after it would spoil what
+    /// it reads.
+    ///
+    /// Never snapshot while collapsed: the hidden icons sit off-screen and
+    /// their autosaved positions are garbage. The panel's flash-expand relies
+    /// on this too — it changes the separator length without going through
+    /// expand(), so isCollapsed stays true and can't poison the snapshot.
+    private func captureArrangement(reason: String) {
+        guard !isCollapsed else { return }
+        let count = MenuBarArrangement.captureAndSave()
+        NSLog("menubar-hide: arrangement snapshot (\(reason)) holds \(count) positions")
+    }
+
+    /// Snapshot once a ⌘-drag rearrangement settles, so it survives even if the
+    /// user never collapses again. Read-only: this poller must never collapse.
+    private func scheduleArrangementSnapshot() {
+        snapshotTask?.cancel()
+        snapshotTask = Task { @MainActor [weak self] in
+            var fingerprint = Set<String>()
+            var stablePolls = 0
+            for _ in 0..<30 where stablePolls < 2 { // cap the wait at ~60s
+                guard (try? await Task.sleep(for: .seconds(2))) != nil else { return }
+                guard let self, !self.isCollapsed, !Task.isCancelled else { return }
+                let current = MenuBarItemScanner.statusItemFingerprint()
+                if current == fingerprint {
+                    stablePolls += 1
+                } else {
+                    stablePolls = 0
+                    fingerprint = current
+                }
+            }
+            self?.captureArrangement(reason: "expanded and stable")
+        }
     }
 
     /// Any collapse/expand supersedes pending automation: a stale
@@ -138,6 +205,8 @@ final class StatusBarController {
     private func stateWillChange() {
         initialCollapseTask?.cancel()
         initialCollapseTask = nil
+        snapshotTask?.cancel()
+        snapshotTask = nil
         disarmAutoCollapse()
     }
 
@@ -338,6 +407,10 @@ final class StatusBarController {
         menu.addItem(loginItem)
 
         menu.addItem(.separator())
+        menu.addItem(arrangementMenuItem())
+        menu.addItem(spacingMenuItem())
+
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit MenubarHide",
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
@@ -345,6 +418,141 @@ final class StatusBarController {
         toggleItem.menu = menu
         toggleItem.button?.performClick(nil)
         toggleItem.menu = nil
+    }
+
+    // MARK: - Icon arrangement menu
+
+    private func arrangementMenuItem() -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false // otherwise AppKit re-enables anything whose target responds
+
+        let save = NSMenuItem(title: "Save Arrangement Now",
+                              action: #selector(saveArrangement), keyEquivalent: "")
+        save.target = self
+        // collapsed = the hidden icons are off-screen and their positions are
+        // garbage; saving here would remember the damage
+        save.isEnabled = !isCollapsed
+        save.toolTip = isCollapsed ? "Show the hidden icons first, then save." : nil
+        submenu.addItem(save)
+
+        let restore = NSMenuItem(title: "Restore Saved Arrangement",
+                                 action: #selector(restoreArrangement), keyEquivalent: "")
+        restore.target = self
+        restore.isEnabled = MenuBarArrangement.saved() != nil
+        submenu.addItem(restore)
+
+        submenu.addItem(.separator())
+        let status: String
+        if let date = MenuBarArrangement.savedDate() {
+            status = "Saved \(date.formatted(date: .abbreviated, time: .shortened)) · \(MenuBarArrangement.savedCount()) icons"
+        } else {
+            status = "Nothing saved yet"
+        }
+        let info = NSMenuItem(title: status, action: nil, keyEquivalent: "")
+        info.isEnabled = false
+        submenu.addItem(info)
+
+        let item = NSMenuItem(title: "Icon Arrangement", action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    @objc private func saveArrangement() {
+        captureArrangement(reason: "manual")
+    }
+
+    @objc private func restoreArrangement() {
+        guard let snapshot = MenuBarArrangement.saved() else { return }
+        let rewritten = MenuBarArrangement.restore(snapshot)
+        let alert = NSAlert()
+        alert.messageText = rewritten == 0 ? "Every icon is already where you left it"
+                                           : "Restored \(rewritten) icon position\(rewritten == 1 ? "" : "s")"
+        // AppKit reads the preferred position when an app creates its status
+        // item, so nothing moves until the owning app launches again
+        alert.informativeText = "Icons of apps that are already running move back on their next launch, or after you log out and back in."
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    // MARK: - Menu bar spacing menu
+
+    private func spacingMenuItem() -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let current = MenuBarSpacing.current()
+
+        for preset in MenuBarSpacing.presets {
+            let entry = NSMenuItem(title: "\(preset) pt",
+                                   action: #selector(spacingPresetChosen(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.tag = preset
+            entry.state = current == preset ? .on : .off
+            submenu.addItem(entry)
+        }
+
+        let custom = NSMenuItem(title: "Custom…", action: #selector(chooseCustomSpacing), keyEquivalent: "")
+        custom.target = self
+        custom.state = current.map { !MenuBarSpacing.presets.contains($0) } == true ? .on : .off
+        submenu.addItem(custom)
+
+        submenu.addItem(.separator())
+        let reset = NSMenuItem(title: "Reset to macOS Default",
+                               action: #selector(resetSpacing), keyEquivalent: "")
+        reset.target = self
+        reset.state = current == nil ? .on : .off
+        submenu.addItem(reset)
+
+        let item = NSMenuItem(title: "Menu Bar Spacing", action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    @objc private func spacingPresetChosen(_ sender: NSMenuItem) {
+        MenuBarSpacing.apply(sender.tag)
+        showSpacingNotice()
+    }
+
+    @objc private func chooseCustomSpacing() {
+        let range = MenuBarSpacing.allowedRange
+        let alert = NSAlert()
+        alert.messageText = "Custom menu bar spacing"
+        alert.informativeText = "Space around each menu bar icon, in points (\(range.lowerBound)–\(range.upperBound)). Smaller values fit more icons; the macOS default is around 12."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 60, height: 24))
+        field.stringValue = String(MenuBarSpacing.current() ?? 12)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Apply")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard let value = Int(field.stringValue.trimmingCharacters(in: .whitespaces)),
+              range.contains(value) else {
+            let error = NSAlert()
+            error.messageText = "Spacing not changed"
+            error.informativeText = "Enter a whole number between \(range.lowerBound) and \(range.upperBound)."
+            error.addButton(withTitle: "OK")
+            error.runModal()
+            return
+        }
+        MenuBarSpacing.apply(value)
+        showSpacingNotice()
+    }
+
+    @objc private func resetSpacing() {
+        MenuBarSpacing.reset()
+        showSpacingNotice()
+    }
+
+    /// Every app reads the spacing when it builds its status items, so only a
+    /// full logout (or restart) rebuilds the whole bar.
+    private func showSpacingNotice() {
+        let alert = NSAlert()
+        alert.messageText = "Log out to apply the new spacing"
+        alert.informativeText = "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change."
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     @objc private func openAbout() {

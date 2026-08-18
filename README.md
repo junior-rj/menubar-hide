@@ -59,8 +59,23 @@ Requires macOS 14 (Sonoma) or later. Universal binary: Apple Silicon and Intel.
 | Click a hidden icon in the panel | Just click it — the click is forwarded to the real icon |
 | Rearrange icons while in panel mode | **⌥-click** the button to expand sideways, then ⌘-drag |
 | Start at login | Right-click the button → **Launch at Login** |
+| Fit more icons on the bar | Right-click the button → **Menu Bar Spacing** → pick a smaller value |
+| Save / restore the icon layout | Right-click the button → **Icon Arrangement** |
 
 After a system reboot the app starts **expanded** for the first minutes, so menu bar apps that launch late don't get hidden by accident. Collapse it with one click once your bar has settled.
+
+### Your arrangement survives a restart
+
+macOS gives every app its own memory of where its icon sits, and a crowded menu bar corrupts that memory: an app that launches while the bar is full gets parked off-screen and *remembers* the bad position, so its icon keeps coming back on the wrong side of the separator (or not at all).
+
+MenubarHide remembers the whole layout while the bar is expanded and stable, and writes it back on every launch. Two things worth knowing:
+
+- Icons only move when the app that owns them **launches again**, so a repair applied now shows up after that app restarts, or after your next login.
+- Snapshots are only taken while the icons are visible. If you want to pin a layout on the spot, expand the bar and use **Icon Arrangement → Save Arrangement Now**.
+
+### Menu bar spacing
+
+**Menu Bar Spacing** sets the macOS-wide `NSStatusItemSpacing` and `NSStatusItemSelectionPadding` defaults (the same values you would write with `defaults write -g`). Smaller values pack the icons tighter, which is the only real way to fit more of them on a laptop bar. Every app reads the setting when it launches, so the change appears **after you log out and back in**, or restart. **Reset to macOS Default** removes both keys.
 
 ### Permissions
 
@@ -80,6 +95,7 @@ Nothing is recorded or stored: captures are point-in-time images of the icon win
   - Collapsing too early scrambles the saved item positions (even swapping their order); the initial collapse is delayed until the layout settles.
   - Status item windows are owned by **Control Center**, not by the app that created them — the scanner identifies the separator by shape (the 10,000 pt window arrives clamped to ~5,016 pt).
   - No API can capture an off-screen window (ScreenCaptureKit fails with `-3811`), so the panel does a 300 ms *flash-expand*: show the icons, capture, hide again.
+- **Remembering the layout** reads every app's `NSStatusItem Preferred Position` key straight from its preferences domain via `CFPreferences`, and writes the remembered values back at launch. Positions are keyed by (domain, key), which sidesteps the identification problem above: it never needs to know which window belongs to which app.
 
 ## Building from source
 
@@ -112,5 +128,7 @@ Technique references: [Hidden Bar](https://github.com/dwarvesf/hidden) (MIT) for
 
 - **Instalar**: baixe o `MenubarHide.dmg` na [última release](../../releases/latest), arraste pra Aplicativos e abra (assinado e notarizado pela Apple).
 - **Usar**: segure **⌘** e arraste pra **esquerda** do `#` os ícones que quer esconder; clique no **+**/**−** ou use **⌃⌥H** pra alternar; clique-direito no botão pra ativar o **modo painel** e o **iniciar com o sistema**; **⌥-clique** expande lateral pra reorganizar os ícones.
+- **Arranjo dos ícones**: o app memoriza a posição de todos os ícones enquanto a barra está expandida e reescreve no launch, então o layout sobrevive a reinício (cada ícone volta ao lugar na próxima vez que o app dono dele abrir). Clique-direito → **Icon Arrangement** pra salvar ou restaurar na hora.
+- **Espaçamento**: clique-direito → **Menu Bar Spacing** ajusta o espaço entre os ícones (equivale ao `defaults write -g NSStatusItemSpacing`); vale após logoff ou reinício.
 - **Permissões**: o painel pede **Gravação de Tela** (capturar a imagem dos ícones, que pertencem a outros apps — exige relançar o app após conceder) e **Acessibilidade** (encaminhar o clique pro ícone real). Nada é gravado ou armazenado; o modo lateral não pede permissão nenhuma.
 - Requer macOS 14+ (binário universal: Apple Silicon e Intel). Código original, MIT; técnicas estudadas no Hidden Bar e no Ice.
