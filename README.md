@@ -73,9 +73,19 @@ MenubarHide remembers the whole layout while the bar is expanded and stable, and
 - Icons only move when the app that owns them **launches again**, so a repair applied now shows up after that app restarts, or after your next login.
 - Snapshots are only taken while the icons are visible. If you want to pin a layout on the spot, expand the bar and use **Icon Arrangement → Save Arrangement Now**.
 
+<p align="center">
+  <img src="docs/screenshot-arrangement.png" alt="Icon Arrangement submenu, with Save and Restore and the date of the last snapshot" width="620">
+  <br><sub>The submenu tells you when the layout was last remembered, and how many icons it covers</sub>
+</p>
+
 ### Menu bar spacing
 
 **Menu Bar Spacing** sets the macOS-wide `NSStatusItemSpacing` and `NSStatusItemSelectionPadding` defaults (the same values you would write with `defaults write -g`). Smaller values pack the icons tighter, which is the only real way to fit more of them on a laptop bar. Every app reads the setting when it launches, so the change appears **after you log out and back in**, or restart. **Reset to macOS Default** removes both keys.
+
+<p align="center">
+  <img src="docs/screenshot-spacing.png" alt="Menu Bar Spacing submenu with presets, a custom option and a reset" width="420">
+  <br><sub>Presets, a custom value, or back to the macOS default. The check marks whatever is set right now</sub>
+</p>
 
 ### Permissions
 
