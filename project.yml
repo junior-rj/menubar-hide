@@ -6,13 +6,17 @@ options:
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   defaultConfig: Debug
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - pt-BR
 
 settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "1.3.0"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "1.4.0"
+    CURRENT_PROJECT_VERSION: "5"
     DEVELOPMENT_TEAM: "Q9KN4S5XHY"
 
 targets:
@@ -23,15 +27,24 @@ targets:
       - path: MenubarHide
         excludes:
           - "**/.DS_Store"
+          - "**/*.xcstrings"
+      # string catalogs belong in Resources; pin the phase instead of relying on inference
+      - path: MenubarHide/Localizable.xcstrings
+        buildPhase: resources
+      - path: MenubarHide/InfoPlist.xcstrings
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sparrow.menubarhide
         GENERATE_INFOPLIST_FILE: true
-        # ponytail: sem sandbox = uso proprio via Developer ID, CGEvent/ScreenCaptureKit na fase 2
+        # string catalogs: emit the localizable strings the catalog is checked against
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        LOCALIZATION_PREFERS_STRING_CATALOGS: "YES"
+        # no sandbox = personal use via Developer ID, CGEvent/ScreenCaptureKit in phase 2
         ENABLE_APP_SANDBOX: "NO"
-        # notarizacao exige hardened runtime; nao conflita com CGEvent/captura (sao TCC)
+        # notarization requires the hardened runtime; no conflict with CGEvent/capture (those are TCC)
         ENABLE_HARDENED_RUNTIME: "YES"
-        # menu bar only: sem icone no Dock
+        # menu bar only: no Dock icon
         INFOPLIST_KEY_LSUIElement: true
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Sparrow. MIT License."

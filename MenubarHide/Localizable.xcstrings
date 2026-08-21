@@ -1,0 +1,356 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld pt" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pt"
+          }
+        }
+      }
+    },
+    "About MenubarHide" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobre o MenubarHide"
+          }
+        }
+      }
+    },
+    "Accessibility permission needed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permissão de Acessibilidade necessária"
+          }
+        }
+      }
+    },
+    "Apply" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplicar"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Custom menu bar spacing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaçamento personalizado da barra de menus"
+          }
+        }
+      }
+    },
+    "Custom…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado…"
+          }
+        }
+      }
+    },
+    "Enter a whole number between %lld and %lld." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite um número inteiro entre %lld e %lld."
+          }
+        }
+      }
+    },
+    "Every icon is already where you left it" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos os ícones já estão onde você deixou"
+          }
+        }
+      }
+    },
+    "Icon Arrangement" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disposição dos Ícones"
+          }
+        }
+      }
+    },
+    "Icons of apps that are already running move back on their next launch, or after you log out and back in." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os ícones dos apps que já estão abertos voltam ao lugar na próxima vez que eles abrirem, ou depois que você encerrar e iniciar a sessão de novo."
+          }
+        }
+      }
+    },
+    "Launch at Login" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir ao Iniciar Sessão"
+          }
+        }
+      }
+    },
+    "Log out to apply the new spacing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerre a sessão para aplicar o novo espaçamento"
+          }
+        }
+      }
+    },
+    "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O macOS só lê o espaçamento da barra de menus quando os apps abrem. Encerre e inicie a sessão de novo, ou reinicie o Mac, para ver a mudança."
+          }
+        }
+      }
+    },
+    "Menu Bar Spacing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaçamento da Barra de Menus"
+          }
+        }
+      }
+    },
+    "MenubarHide needs Accessibility access to click hidden icons for you. Grant it in System Settings › Privacy & Security › Accessibility, then try again." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O MenubarHide precisa de acesso à Acessibilidade para clicar nos ícones ocultos por você. Conceda em Ajustes do Sistema › Privacidade e Segurança › Acessibilidade e tente de novo."
+          }
+        }
+      }
+    },
+    "MenubarHide needs Screen Recording access to show the hidden icons in the panel. Grant it in System Settings, then relaunch MenubarHide (macOS requires a relaunch for this permission)." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O MenubarHide precisa de acesso à Gravação de Tela para mostrar os ícones ocultos no painel. Conceda nos Ajustes do Sistema e abra o MenubarHide de novo (o macOS exige reabrir o app para essa permissão)."
+          }
+        }
+      }
+    },
+    "No hidden icons" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum ícone oculto"
+          }
+        }
+      }
+    },
+    "Nothing saved yet" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada salvo ainda"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Open System Settings" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir os Ajustes do Sistema"
+          }
+        }
+      }
+    },
+    "Quit MenubarHide" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrar o MenubarHide"
+          }
+        }
+      }
+    },
+    "Reset to macOS Default" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar o Padrão do macOS"
+          }
+        }
+      }
+    },
+    "Restore Saved Arrangement" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar Disposição Salva"
+          }
+        }
+      }
+    },
+    "Restored %lld icon positions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restored %lld icon position"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restored %lld icon positions"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restaurada %lld posição de ícone"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restauradas %lld posições de ícone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Save Arrangement Now" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar Disposição Agora"
+          }
+        }
+      }
+    },
+    "Saved %@ · %lld icons" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvo em %@ · %lld ícones"
+          }
+        }
+      }
+    },
+    "Screen Recording permission needed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permissão de Gravação de Tela necessária"
+          }
+        }
+      }
+    },
+    "Show Hidden Icons in Panel" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar Ícones Ocultos no Painel"
+          }
+        }
+      }
+    },
+    "Show the hidden icons first, then save." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostre os ícones ocultos antes de salvar."
+          }
+        }
+      }
+    },
+    "Space around each menu bar icon, in points (%lld–%lld). Smaller values fit more icons; the macOS default is around 12." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaço ao redor de cada ícone da barra de menus, em pontos (%lld–%lld). Valores menores cabem mais ícones; o padrão do macOS é cerca de 12."
+          }
+        }
+      }
+    },
+    "Spacing not changed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaçamento não alterado"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

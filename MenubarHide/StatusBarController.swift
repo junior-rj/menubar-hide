@@ -250,8 +250,8 @@ final class StatusBarController {
         guard ItemCapturer.hasPermission() else {
             NSLog("menubar-hide: screen recording permission missing")
             showPermissionAlert(
-                message: "Screen Recording permission needed",
-                informative: "MenubarHide needs Screen Recording access to show the hidden icons in the panel. Grant it in System Settings, then relaunch MenubarHide (macOS requires a relaunch for this permission).",
+                message: String(localized: "Screen Recording permission needed"),
+                informative: String(localized: "MenubarHide needs Screen Recording access to show the hidden icons in the panel. Grant it in System Settings, then relaunch MenubarHide (macOS requires a relaunch for this permission)."),
                 settingsAnchor: "Privacy_ScreenCapture",
                 beforeOpeningSettings: { ItemCapturer.requestPermission() })
             return
@@ -287,8 +287,8 @@ final class StatusBarController {
         guard ClickForwarder.isTrusted() else {
             NSLog("menubar-hide: accessibility not granted, cannot forward click")
             showPermissionAlert(
-                message: "Accessibility permission needed",
-                informative: "MenubarHide needs Accessibility access to click hidden icons for you. Grant it in System Settings › Privacy & Security › Accessibility, then try again.",
+                message: String(localized: "Accessibility permission needed"),
+                informative: String(localized: "MenubarHide needs Accessibility access to click hidden icons for you. Grant it in System Settings › Privacy & Security › Accessibility, then try again."),
                 settingsAnchor: "Privacy_Accessibility",
                 beforeOpeningSettings: { ClickForwarder.promptForAccessibility() })
             return
@@ -341,8 +341,8 @@ final class StatusBarController {
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = informative
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Open System Settings"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         NSApp.activate(ignoringOtherApps: true) // LSUIElement apps need this for runModal
         if alert.runModal() == .alertFirstButtonReturn {
             // system prompt fires here, right as Settings opens — it also
@@ -388,19 +388,19 @@ final class StatusBarController {
     private func showMenu() {
         let menu = NSMenu()
 
-        let aboutItem = NSMenuItem(title: "About MenubarHide",
+        let aboutItem = NSMenuItem(title: String(localized: "About MenubarHide"),
                                    action: #selector(openAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
         menu.addItem(.separator())
 
-        let panelItem = NSMenuItem(title: "Show Hidden Icons in Panel",
+        let panelItem = NSMenuItem(title: String(localized: "Show Hidden Icons in Panel"),
                                    action: #selector(togglePanelMode), keyEquivalent: "")
         panelItem.target = self
         panelItem.state = showInPanel ? .on : .off
         menu.addItem(panelItem)
 
-        let loginItem = NSMenuItem(title: "Launch at Login",
+        let loginItem = NSMenuItem(title: String(localized: "Launch at Login"),
                                    action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.target = self
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -411,7 +411,7 @@ final class StatusBarController {
         menu.addItem(spacingMenuItem())
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit MenubarHide",
+        menu.addItem(NSMenuItem(title: String(localized: "Quit MenubarHide"),
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         // Assign, click, unassign — keeps left-click free for toggle()
@@ -426,16 +426,16 @@ final class StatusBarController {
         let submenu = NSMenu()
         submenu.autoenablesItems = false // otherwise AppKit re-enables anything whose target responds
 
-        let save = NSMenuItem(title: "Save Arrangement Now",
+        let save = NSMenuItem(title: String(localized: "Save Arrangement Now"),
                               action: #selector(saveArrangement), keyEquivalent: "")
         save.target = self
         // collapsed = the hidden icons are off-screen and their positions are
         // garbage; saving here would remember the damage
         save.isEnabled = !isCollapsed
-        save.toolTip = isCollapsed ? "Show the hidden icons first, then save." : nil
+        save.toolTip = isCollapsed ? String(localized: "Show the hidden icons first, then save.") : nil
         submenu.addItem(save)
 
-        let restore = NSMenuItem(title: "Restore Saved Arrangement",
+        let restore = NSMenuItem(title: String(localized: "Restore Saved Arrangement"),
                                  action: #selector(restoreArrangement), keyEquivalent: "")
         restore.target = self
         restore.isEnabled = MenuBarArrangement.saved() != nil
@@ -444,15 +444,16 @@ final class StatusBarController {
         submenu.addItem(.separator())
         let status: String
         if let date = MenuBarArrangement.savedDate() {
-            status = "Saved \(date.formatted(date: .abbreviated, time: .shortened)) · \(MenuBarArrangement.savedCount()) icons"
+            // the date formats itself for the user's locale
+            status = String(localized: "Saved \(date.formatted(date: .abbreviated, time: .shortened)) · \(MenuBarArrangement.savedCount()) icons")
         } else {
-            status = "Nothing saved yet"
+            status = String(localized: "Nothing saved yet")
         }
         let info = NSMenuItem(title: status, action: nil, keyEquivalent: "")
         info.isEnabled = false
         submenu.addItem(info)
 
-        let item = NSMenuItem(title: "Icon Arrangement", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: String(localized: "Icon Arrangement"), action: nil, keyEquivalent: "")
         item.submenu = submenu
         return item
     }
@@ -465,12 +466,13 @@ final class StatusBarController {
         guard let snapshot = MenuBarArrangement.saved() else { return }
         let rewritten = MenuBarArrangement.restore(snapshot)
         let alert = NSAlert()
-        alert.messageText = rewritten == 0 ? "Every icon is already where you left it"
-                                           : "Restored \(rewritten) icon position\(rewritten == 1 ? "" : "s")"
+        alert.messageText = rewritten == 0
+            ? String(localized: "Every icon is already where you left it")
+            : String(localized: "Restored \(rewritten) icon positions")
         // AppKit reads the preferred position when an app creates its status
         // item, so nothing moves until the owning app launches again
-        alert.informativeText = "Icons of apps that are already running move back on their next launch, or after you log out and back in."
-        alert.addButton(withTitle: "OK")
+        alert.informativeText = String(localized: "Icons of apps that are already running move back on their next launch, or after you log out and back in.")
+        alert.addButton(withTitle: String(localized: "OK"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
@@ -483,7 +485,7 @@ final class StatusBarController {
         let current = MenuBarSpacing.current()
 
         for preset in MenuBarSpacing.presets {
-            let entry = NSMenuItem(title: "\(preset) pt",
+            let entry = NSMenuItem(title: String(localized: "\(preset) pt"),
                                    action: #selector(spacingPresetChosen(_:)), keyEquivalent: "")
             entry.target = self
             entry.tag = preset
@@ -491,19 +493,20 @@ final class StatusBarController {
             submenu.addItem(entry)
         }
 
-        let custom = NSMenuItem(title: "Custom…", action: #selector(chooseCustomSpacing), keyEquivalent: "")
+        let custom = NSMenuItem(title: String(localized: "Custom…"),
+                                action: #selector(chooseCustomSpacing), keyEquivalent: "")
         custom.target = self
         custom.state = current.map { !MenuBarSpacing.presets.contains($0) } == true ? .on : .off
         submenu.addItem(custom)
 
         submenu.addItem(.separator())
-        let reset = NSMenuItem(title: "Reset to macOS Default",
+        let reset = NSMenuItem(title: String(localized: "Reset to macOS Default"),
                                action: #selector(resetSpacing), keyEquivalent: "")
         reset.target = self
         reset.state = current == nil ? .on : .off
         submenu.addItem(reset)
 
-        let item = NSMenuItem(title: "Menu Bar Spacing", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: String(localized: "Menu Bar Spacing"), action: nil, keyEquivalent: "")
         item.submenu = submenu
         return item
     }
@@ -516,22 +519,22 @@ final class StatusBarController {
     @objc private func chooseCustomSpacing() {
         let range = MenuBarSpacing.allowedRange
         let alert = NSAlert()
-        alert.messageText = "Custom menu bar spacing"
-        alert.informativeText = "Space around each menu bar icon, in points (\(range.lowerBound)–\(range.upperBound)). Smaller values fit more icons; the macOS default is around 12."
+        alert.messageText = String(localized: "Custom menu bar spacing")
+        alert.informativeText = String(localized: "Space around each menu bar icon, in points (\(range.lowerBound)–\(range.upperBound)). Smaller values fit more icons; the macOS default is around 12.")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 60, height: 24))
         field.stringValue = String(MenuBarSpacing.current() ?? 12)
         alert.accessoryView = field
-        alert.addButton(withTitle: "Apply")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Apply"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         guard let value = Int(field.stringValue.trimmingCharacters(in: .whitespaces)),
               range.contains(value) else {
             let error = NSAlert()
-            error.messageText = "Spacing not changed"
-            error.informativeText = "Enter a whole number between \(range.lowerBound) and \(range.upperBound)."
-            error.addButton(withTitle: "OK")
+            error.messageText = String(localized: "Spacing not changed")
+            error.informativeText = String(localized: "Enter a whole number between \(range.lowerBound) and \(range.upperBound).")
+            error.addButton(withTitle: String(localized: "OK"))
             error.runModal()
             return
         }
@@ -548,15 +551,15 @@ final class StatusBarController {
     /// full logout (or restart) rebuilds the whole bar.
     private func showSpacingNotice() {
         let alert = NSAlert()
-        alert.messageText = "Log out to apply the new spacing"
-        alert.informativeText = "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change."
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Log out to apply the new spacing")
+        alert.informativeText = String(localized: "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change.")
+        alert.addButton(withTitle: String(localized: "OK"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
 
     @objc private func openAbout() {
-        // LSUIElement: sem ativar, o painel About abre atrás das janelas dos outros apps
+        // LSUIElement: without activating, the About panel opens behind other apps' windows
         NSApp.activate(ignoringOtherApps: true)
         let credits = NSAttributedString(
             string: "github.com/junior-rj/menubar-hide",

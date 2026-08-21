@@ -37,6 +37,7 @@ Interno
 - MenubarHide/ClickForwarder.swift — clique sintético via CGEvent
 - MenubarHide/MenuBarArrangement.swift — snapshot e restauração das posições de todos os ícones via CFPreferences
 - MenubarHide/MenuBarSpacing.swift — leitura e escrita das duas chaves globais de espaçamento
+- MenubarHide/Localizable.xcstrings — String Catalog com toda a UI em EN e pt-BR (InfoPlist.xcstrings traduz o copyright do painel About)
 - scripts/release.sh — DMG assinado (Developer ID) e notarizado, perfil de notary do time (yourlaunch-notary)
 
 ## Regras específicas
@@ -53,6 +54,12 @@ Interno
   - Custo medido do capture: 73ms frio, 2ms quente (cfprefsd cacheia). Roda inline na main de propósito, porque o collapse logo depois estragaria o que ele leria
   - `kCGWindowName` das janelas de status entrega o autosaveName (`Item-0` pros apps que não nomeiam), mas o design não depende disso: indexa por (domínio, chave), então a ambiguidade dos `Item-0` não atrapalha
 - Espaçamento: `NSStatusItemSpacing` e `NSStatusItemSelectionPadding` no domínio global (`kCFPreferencesAnyApplication`, o mesmo que `defaults write -g`). Ler por CFPreferences, não por UserDefaults.standard, que enxergaria também um valor do próprio app. Só vale após logoff ou reinício, porque cada app lê no launch
+- Localização (v1.4): toda string de UI passa por `String(localized:)` e vive no `Localizable.xcstrings` (EN fonte, pt-BR traduzido). Nunca deixar literal solto no código. Pegadinhas:
+  - O XcodeGen não infere build phase de `.xcstrings`: o `project.yml` exclui `**/*.xcstrings` do path de sources e adiciona cada catálogo com `buildPhase: resources`. Sem isso o catálogo não vira `.lproj` no bundle
+  - A chave é o texto em inglês COM os especificadores que a interpolação gera (`%lld` pra Int, `%@` pra String). Chave que não bate sai em inglês cru no pt-BR, sem erro de build
+  - Plural mora no catálogo (`variations.plural`), nunca em ternário `"s"` no código: em português muda número e concordância
+  - `en.lproj` sai sem `Localizable.strings` de propósito (na língua fonte a chave é o valor); só o `stringsdict` do plural aparece
+  - Conferir cobertura comparando as chaves extraídas pelo compilador (`*.stringsdata` no DerivedData, campo `tables`) com as do catálogo: os dois conjuntos têm que ser idênticos
 - Submenu com item desabilitado precisa de `autoenablesItems = false`, senão o AppKit reabilita tudo que tem target respondendo
 - Painel clicável exige as duas subclasses em HiddenItemsPanel.swift: NSPanel com canBecomeKey=true (borderless recusa key e mata botões e Esc) + NSHostingView com acceptsFirstMouse (senão o 1º clique só foca a janela). Manter .nonactivatingPanel (app LSUIElement não ativa)
 - Clique sintético precisa de mouseEventClickState=1 (clickCount 0 é ignorado pela maioria dos status items); antes de postar, validar que o frame alvo está na faixa da menu bar de algum display (anti-spoofing de janela no status layer; display à esquerda do principal tem X negativo válido)
