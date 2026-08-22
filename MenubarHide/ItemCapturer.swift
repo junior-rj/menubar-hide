@@ -1,8 +1,9 @@
 import AppKit
 import ScreenCaptureKit
 
-// Screenshots of individual (off-screen) status item windows via
-// ScreenCaptureKit. Requires the Screen Recording permission.
+// Screenshots of individual (off-screen) status item windows. Tries the legacy
+// CGWindowList API first and falls back to ScreenCaptureKit; both need the
+// Screen Recording permission.
 @MainActor
 enum ItemCapturer {
     static func hasPermission() -> Bool {
@@ -13,17 +14,24 @@ enum ItemCapturer {
         CGRequestScreenCaptureAccess()
     }
 
+    /// Backing scale of the display the window sits on. NSScreen.frame is
+    /// AppKit space (y flipped relative to the CGWindowList frames we get
+    /// here), but X is identical in both, and a menu bar item is unambiguous
+    /// by X alone — so match on that instead of converting.
+    private static func scale(for frame: CGRect) -> CGFloat {
+        let midX = frame.midX
+        let screen = NSScreen.screens.first { $0.frame.minX <= midX && midX < $0.frame.maxX }
+        return (screen ?? NSScreen.main)?.backingScaleFactor ?? 2
+    }
+
     static func capture(_ windows: [MenuBarItemWindow]) async -> [CapturedItem] {
-        let content: SCShareableContent
-        do {
-            content = try await SCShareableContent
-                .excludingDesktopWindows(false, onScreenWindowsOnly: false)
-        } catch {
-            NSLog("menubar-hide: SCShareableContent failed: \(error)")
-            return []
-        }
-        NSLog("menubar-hide: capturing \(windows.count) windows, shareable has \(content.windows.count)")
-        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        NSLog("menubar-hide: capturing \(windows.count) windows")
+
+        // Fetched lazily: the legacy path below must not be gated on the SCK
+        // one. Nil after a fetch attempt means SCK is unavailable — don't retry
+        // it once per window.
+        var content: SCShareableContent?
+        var triedFetchingContent = false
 
         var items: [CapturedItem] = []
         for window in windows {
@@ -37,10 +45,21 @@ enum ItemCapturer {
                                           image: NSImage(cgImage: cgImage, size: window.frame.size)))
                 continue
             }
-            guard let scWindow = content.windows.first(where: { $0.windowID == window.id }) else {
+            if !triedFetchingContent {
+                triedFetchingContent = true
+                do {
+                    content = try await SCShareableContent
+                        .excludingDesktopWindows(false, onScreenWindowsOnly: false)
+                    NSLog("menubar-hide: shareable content has \(content?.windows.count ?? 0) windows")
+                } catch {
+                    NSLog("menubar-hide: SCShareableContent failed: \(error)")
+                }
+            }
+            guard let scWindow = content?.windows.first(where: { $0.windowID == window.id }) else {
                 NSLog("menubar-hide: window \(window.id) not in shareable content")
                 continue
             }
+            let scale = scale(for: window.frame)
             let config = SCStreamConfiguration()
             config.width = Int(window.frame.width * scale)
             config.height = Int(window.frame.height * scale)

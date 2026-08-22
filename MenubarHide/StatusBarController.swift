@@ -94,7 +94,7 @@ final class StatusBarController {
 
     /// The separator must stay left of (= greater than) the chevron, and both
     /// must be on-screen: a parked item autosaves x ≈ -4220.
-    private static func isSanePair(toggle: Double, separator: Double) -> Bool {
+    static func isSanePair(toggle: Double, separator: Double) -> Bool {
         MenuBarArrangement.isValid(toggle) && MenuBarArrangement.isValid(separator)
             && toggle > 0 && separator > toggle
     }
@@ -258,8 +258,9 @@ final class StatusBarController {
         }
         isOpeningPanel = true
         let anchorFrame = toggleItem.button?.window?.frame ?? .zero
-        Task { @MainActor in
-            defer { isOpeningPanel = false }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.isOpeningPanel = false }
             let windows = MenuBarItemScanner.hiddenItems()
             NSLog("menubar-hide: scanner found \(windows.count) hidden items")
             var items = await ItemCapturer.capture(windows)
@@ -294,7 +295,8 @@ final class StatusBarController {
             return
         }
         expand()
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             // the bar relayouts asynchronously; retry until the item lands on-screen
             var frame: CGRect?
             for _ in 0..<3 {
@@ -327,10 +329,23 @@ final class StatusBarController {
         CGGetActiveDisplayList(0, nil, &count)
         var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
         CGGetActiveDisplayList(count, &displays, &count)
+        return isInStrip(frame, displays: displays.map(CGDisplayBounds))
+    }
+
+    /// Geometry half of the check above, split out so it can run without real
+    /// displays. Requires the WHOLE frame inside the display, not just its
+    /// centre: a very wide window centred on the strip would otherwise pass.
+    /// No width ceiling on purpose — status items with text (clocks, meters)
+    /// are legitimately hundreds of points wide.
+    ///
+    /// This bounds where a click may land, not who receives it: the event is
+    /// posted by coordinate, so whoever occupies that point at post time gets
+    /// it. That TOCTOU is inherent to CGEvent and is not closed here.
+    static func isInStrip(_ frame: CGRect, displays: [CGRect]) -> Bool {
         let mid = CGPoint(x: frame.midX, y: frame.midY)
-        return displays.contains { display in
-            let bounds = CGDisplayBounds(display)
-            return bounds.contains(mid)
+        return displays.contains { bounds in
+            bounds.contains(mid)
+                && frame.minX >= bounds.minX && frame.maxX <= bounds.maxX
                 && abs(frame.minY - bounds.minY) <= 2
                 && frame.height <= 40
         }
@@ -363,8 +378,8 @@ final class StatusBarController {
             guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return } // skip our synthetic click
             guard let self, !self.isCollapsed else { return }
             if self.autoCollapseMonitor == nil {
-                self.autoCollapseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
-                    MainActor.assumeIsolated { self.finishAutoCollapse() }
+                self.autoCollapseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.finishAutoCollapse() }
                 }
                 NSLog("menubar-hide: auto-collapse armed")
             }

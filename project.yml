@@ -15,14 +15,17 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "1.4.0"
-    CURRENT_PROJECT_VERSION: "5"
+    MARKETING_VERSION: "1.4.1"
+    CURRENT_PROJECT_VERSION: "6"
     DEVELOPMENT_TEAM: "Q9KN4S5XHY"
 
 targets:
   MenubarHide:
     type: application
     platform: macOS
+    scheme:
+      testTargets:
+        - MenubarHideTests
     sources:
       - path: MenubarHide
         excludes:
@@ -49,3 +52,18 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Sparrow. MIT License."
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  MenubarHideTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MenubarHideTests
+    dependencies:
+      - target: MenubarHide
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        # app-hosted so @testable import can link against the app target;
+        # AppDelegate skips its setup under XCTest so the run stays inert
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MenubarHide.app/Contents/MacOS/MenubarHide"
+        BUNDLE_LOADER: "$(TEST_HOST)"

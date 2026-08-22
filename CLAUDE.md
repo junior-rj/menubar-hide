@@ -68,4 +68,6 @@ Interno
 - Hardened runtime ligado (exigência da notarização); sandbox continua desligado
 - Trocar a assinatura do app instalado (dev ↔ Developer ID) invalida as permissões TCC; reconceder Gravação de Tela e Acessibilidade
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
+- Testes: `xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -destination 'platform=macOS' test` (Swift Testing, target MenubarHideTests; o AppDelegate pula a inicialização sob XCTest pra não mexer na menu bar real)
 - Release: `./scripts/release.sh` (gera build/MenubarHide.dmg notarizado)
+- **Entrega não termina no build verde.** Mudança de código concluída = bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml + `./scripts/release.sh`. Fazer isso como parte do plano, sem esperar o Junior pedir (ele cobrou em 2026-08-22: "sempre tenho que pedir"). Incremento pelo tipo da mudança: patch pra correção interna, minor pra feature visível. Commit e push continuam exigindo ordem explícita dele

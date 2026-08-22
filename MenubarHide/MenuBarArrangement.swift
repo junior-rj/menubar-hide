@@ -59,14 +59,21 @@ enum MenuBarArrangement {
     @discardableResult
     static func captureAndSave() -> Int {
         let (fresh, domains) = capture()
-        var merged = (saved() ?? [:]).filter { domains.contains($0.key) }
-        for (domain, values) in fresh {
-            merged[domain, default: [:]].merge(values) { _, new in new }
-        }
+        let merged = merge(saved: saved() ?? [:], fresh: fresh, liveDomains: domains)
         let defaults = UserDefaults.standard
         defaults.set(merged, forKey: snapshotKey)
         defaults.set(Date(), forKey: snapshotDateKey)
         return merged.values.reduce(0) { $0 + $1.count }
+    }
+
+    /// Pure half of the merge above, split out so it can be exercised without
+    /// touching cfprefsd or UserDefaults.
+    static func merge(saved: Snapshot, fresh: Snapshot, liveDomains: Set<String>) -> Snapshot {
+        var merged = saved.filter { liveDomains.contains($0.key) }
+        for (domain, values) in fresh {
+            merged[domain, default: [:]].merge(values) { _, new in new }
+        }
+        return merged
     }
 
     // MARK: - Restore
