@@ -70,4 +70,12 @@ Interno
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
 - Testes: `xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -destination 'platform=macOS' test` (Swift Testing, target MenubarHideTests; o AppDelegate pula a inicialização sob XCTest pra não mexer na menu bar real)
 - Release: `./scripts/release.sh` (gera build/MenubarHide.dmg notarizado)
-- **Entrega não termina no build verde.** Mudança de código concluída = bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml + `./scripts/release.sh`. Fazer isso como parte do plano, sem esperar o Junior pedir (ele cobrou em 2026-08-22: "sempre tenho que pedir"). Incremento pelo tipo da mudança: patch pra correção interna, minor pra feature visível. Commit e push continuam exigindo ordem explícita dele
+- **Entrega não termina no build verde, nem no DMG notarizado.** Mudança de código concluída são SETE passos, todos parte do plano, sem esperar o Junior pedir (ele cobrou duas vezes em 2026-08-22: "sempre tenho que pedir" e "ta chato isso"). Entregar pela metade e listar o resto como pendência é o erro que ele está cobrando:
+  1. Bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml (patch pra correção interna, minor pra feature visível)
+  2. `xcodebuild ... test` verde
+  3. `./scripts/release.sh` (assina, notariza, grampeia)
+  4. Commit em Conventional Commits, direto na main (é o padrão do histórico deste repo, não abrir branch pra release)
+  5. Tag `vX.Y.Z` anotada e `git push origin main --follow-tags`
+  6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em português. A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo
+  7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
+- Só o `auditoria_tecnica.md` fica fora do commit por decisão pendente: o repo é público e é documento interno em português
