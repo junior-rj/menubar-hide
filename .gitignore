@@ -3,3 +3,8 @@
 .DS_Store
 build/
 DerivedData/
+xcuserdata/
+
+# notas internas: o repo e publico
+CLAUDE.local.md
+auditoria_tecnica.md

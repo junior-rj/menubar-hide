@@ -3,9 +3,6 @@
 ## O que é
 App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/recolhe os ícones escondidos, com opção de mostrar num painel abaixo da menu bar (resolve o notch).
 
-## Tipo
-Interno
-
 ## Escopo
 - App novo em SwiftUI, macOS 14+ (subiu de 13 por causa do ScreenCaptureKit do painel)
 - Esconder/mostrar ícones da menu bar com um clique no botão + / − (separador é #)
@@ -20,12 +17,9 @@ Interno
 - Truque lateral: NSStatusItem separador com length 10000 empurra os ícones à esquerda dele pra fora da tela. Nunca usar isVisible (perde a posição do autosave)
 - Truque do painel: CGWindowList acha os itens fora da tela, ScreenCaptureKit captura as imagens, NSPanel mostra abaixo da menu bar, clique é encaminhado via CGEvent (expande temporário + re-colapsa)
 - Permissões do painel: Gravação de Tela (capturar) e Acessibilidade (encaminhar clique). Gravação de Tela exige relançar o app após conceder
-- Autostart via SMAppService.mainApp (padrão do yourlaunch com .mainApp no lugar de .daemon)
+- Autostart via SMAppService.mainApp
 - Projeto via XcodeGen (project.yml fonte de verdade, .xcodeproj gitignored, rodar `xcodegen` após mudar)
-- Repo: https://github.com/junior-rj/menubar-hide (PÚBLICO desde 2026-07-13, MIT, release v1.3.0 com DMG assinado e notarizado)
-- Divulgação: textos prontos em conteudo/menubar-hide-divulgacao.md (workspace); Homebrew só no cask oficial, quando o repo tiver ~75+ estrelas (régua de notabilidade); PRs no awesome-mac/awesome-menubar após ficar público
-- Seguir a skill ios-swift-guidelines
-- Sem prazo definido
+- Repo: https://github.com/junior-rj/menubar-hide (público desde 2026-07-13, MIT, releases com DMG assinado e notarizado)
 
 ## Arquivos importantes
 - project.yml — definição do projeto (rodar xcodegen após mudar)
@@ -38,7 +32,7 @@ Interno
 - MenubarHide/MenuBarArrangement.swift — snapshot e restauração das posições de todos os ícones via CFPreferences
 - MenubarHide/MenuBarSpacing.swift — leitura e escrita das duas chaves globais de espaçamento
 - MenubarHide/Localizable.xcstrings — String Catalog com toda a UI em EN e pt-BR (InfoPlist.xcstrings traduz o copyright do painel About)
-- scripts/release.sh — DMG assinado (Developer ID) e notarizado, perfil de notary do time (yourlaunch-notary)
+- scripts/release.sh — DMG assinado (Developer ID) e notarizado; o perfil de notary vem da variável `NOTARY_PROFILE` (perfil do keychain criado com `notarytool store-credentials`)
 
 ## Regras específicas
 - Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
@@ -70,7 +64,7 @@ Interno
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
 - Testes: `xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -destination 'platform=macOS' test` (Swift Testing, target MenubarHideTests; o AppDelegate pula a inicialização sob XCTest pra não mexer na menu bar real)
 - Release: `./scripts/release.sh` (gera build/MenubarHide.dmg notarizado)
-- **Entrega não termina no build verde, nem no DMG notarizado.** Mudança de código concluída são SETE passos, todos parte do plano, sem esperar o Junior pedir (ele cobrou duas vezes em 2026-08-22: "sempre tenho que pedir" e "ta chato isso"). Entregar pela metade e listar o resto como pendência é o erro que ele está cobrando:
+- **Entrega não termina no build verde, nem no DMG notarizado.** Mudança de código concluída são SETE passos, todos parte do plano. Entregar pela metade e listar o resto como pendência não é entrega:
   1. Bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml (patch pra correção interna, minor pra feature visível)
   2. `xcodebuild ... test` verde
   3. `./scripts/release.sh` (assina, notariza, grampeia)
@@ -78,4 +72,4 @@ Interno
   5. Tag `vX.Y.Z` anotada e `git push origin main --follow-tags`
   6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em português. A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo
   7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
-- Só o `auditoria_tecnica.md` fica fora do commit por decisão pendente: o repo é público e é documento interno em português
+- Repo público: documento interno, nota de processo e relatório em português não entram no tree. Nota de trabalho fica no `CLAUDE.local.md` (carregado junto com este arquivo, ignorado pelo git); relatório vai pro workspace. O que não deve subir entra no `.gitignore` no momento da decisão
