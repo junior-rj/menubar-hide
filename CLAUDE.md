@@ -70,6 +70,6 @@ App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/
   3. `./scripts/release.sh` (assina, notariza, grampeia)
   4. Commit em Conventional Commits, direto na main (é o padrão do histórico deste repo, não abrir branch pra release)
   5. Tag `vX.Y.Z` anotada e `git push origin main --follow-tags`
-  6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em português. A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo
+  6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em INGLÊS, no estilo das anteriores (frase de abertura, bullets, fechamento "Signed with Developer ID and notarized by Apple. Requires macOS 14+."). A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo; a v1.4.1 saiu em português porque esta regra dizia o contrário (corrigida em 2026-08-27)
   7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
 - Repo público: documento interno, nota de processo e relatório em português não entram no tree. Nota de trabalho fica no `CLAUDE.local.md` (carregado junto com este arquivo, ignorado pelo git); relatório vai pro workspace. O que não deve subir entra no `.gitignore` no momento da decisão
