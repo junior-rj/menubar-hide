@@ -32,7 +32,7 @@ App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/
 - MenubarHide/MenuBarArrangement.swift — snapshot e restauração das posições de todos os ícones via CFPreferences
 - MenubarHide/MenuBarSpacing.swift — leitura e escrita das duas chaves globais de espaçamento
 - MenubarHide/Localizable.xcstrings — String Catalog com toda a UI em EN e pt-BR (InfoPlist.xcstrings traduz o copyright do painel About)
-- scripts/release.sh — DMG assinado (Developer ID) e notarizado; o perfil de notary vem da variável `NOTARY_PROFILE` (perfil do keychain criado com `notarytool store-credentials`)
+- scripts/release.sh — DMG assinado (Developer ID) e notarizado; desde 31/08/2026 é um wrapper de config: o fluxo mora no compartilhado `sparrow_workspace/scripts/release-macos.sh` (build fora do repo, ExportOptions gerado de `TEAM_ID`, saída em `build/MenubarHide.dmg` + `build/export/MenubarHide-stapled.app`); o perfil de notary vem da variável `NOTARY_PROFILE` (perfil do keychain criado com `notarytool store-credentials`)
 
 ## Regras específicas
 - Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
@@ -71,5 +71,5 @@ App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/
   4. Commit em Conventional Commits, direto na main (é o padrão do histórico deste repo, não abrir branch pra release)
   5. Tag `vX.Y.Z` anotada e `git push origin main --follow-tags`
   6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em INGLÊS, no estilo das anteriores (frase de abertura, bullets, fechamento "Signed with Developer ID and notarized by Apple. Requires macOS 14+."). A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo; a v1.4.1 saiu em português porque esta regra dizia o contrário (corrigida em 2026-08-27)
-  7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
+  7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide-stapled.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
 - Repo público: documento interno, nota de processo e relatório em português não entram no tree. Nota de trabalho fica no `CLAUDE.local.md` (carregado junto com este arquivo, ignorado pelo git); relatório vai pro workspace. O que não deve subir entra no `.gitignore` no momento da decisão
