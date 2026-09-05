@@ -62,7 +62,9 @@ Requires macOS 14 (Sonoma) or later. Universal binary: Apple Silicon and Intel.
 | Fit more icons on the bar | Right-click the button → **Menu Bar Spacing** → pick a smaller value |
 | Save / restore the icon layout | Right-click the button → **Icon Arrangement** |
 
-After a system reboot the app starts **expanded** for the first minutes, so menu bar apps that launch late don't get hidden by accident. Collapse it with one click once your bar has settled.
+After a system reboot the app starts **expanded** and collapses on its own once the menu bar stops changing: a few seconds on a quiet bar, up to two minutes after a busy login. That way menu bar apps that launch late don't get hidden by accident.
+
+If ⌃⌥H is already taken by another app, the right-click menu says so; the button still works.
 
 ### Your arrangement survives a restart
 
@@ -105,7 +107,7 @@ Nothing is recorded or stored: captures are point-in-time images of the icon win
   - Collapsing too early scrambles the saved item positions (even swapping their order); the initial collapse is delayed until the layout settles.
   - Status item windows are owned by **Control Center**, not by the app that created them — the scanner identifies the separator by shape (the 10,000 pt window arrives clamped to ~5,016 pt).
   - No API can capture an off-screen window (ScreenCaptureKit fails with `-3811`), so the panel does a 300 ms *flash-expand*: show the icons, capture, hide again.
-- **Remembering the layout** reads every app's `NSStatusItem Preferred Position` key straight from its preferences domain via `CFPreferences`, and writes the remembered values back at launch. Positions are keyed by (domain, key), which sidesteps the identification problem above: it never needs to know which window belongs to which app.
+- **Remembering the layout** reads every app's `NSStatusItem Preferred Position` key straight from its preferences domain via `CFPreferences`, and writes the remembered values back at launch. Sandboxed apps keep that key inside their container, so those are addressed by the container plist path instead of the bundle id. Positions are keyed by (domain, key), which sidesteps the identification problem above: it never needs to know which window belongs to which app.
 
 ## Building from source
 
@@ -118,7 +120,7 @@ xcodegen
 xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build
 ```
 
-`project.yml` is the source of truth; the `.xcodeproj` is generated and gitignored. `scripts/release.sh` produces the signed and notarized DMG (adjust the signing identity and notary profile to your own team).
+`project.yml` is the source of truth; the `.xcodeproj` is generated and gitignored. `scripts/release.sh` is a thin wrapper around a release flow that lives outside this repository (signing, notarization, DMG); to release your own build, sign and notarize with your team's Developer ID.
 
 > Tip: features that need permissions (the panel) must be tested on the build installed in `/Applications` — macOS invalidates TCC grants when the code signature changes between Debug and Release builds.
 

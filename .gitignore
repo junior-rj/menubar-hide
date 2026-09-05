@@ -7,4 +7,5 @@ xcuserdata/
 
 # notas internas: o repo e publico
 CLAUDE.local.md
-auditoria_tecnica.md
+auditoria*.md
+.claude/settings.local.json

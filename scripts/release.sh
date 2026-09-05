@@ -11,4 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export APP_NAME="MenubarHide"
-exec ../../scripts/release-macos.sh
+SHARED="../../scripts/release-macos.sh"
+# the flow lives in the Sparrow workspace, two levels up; a clone elsewhere must not exec whatever sits there
+[ -x "$SHARED" ] || { echo "shared release script not found: $SHARED (this wrapper only works inside sparrow_workspace)" >&2; exit 1; }
+exec "$SHARED"
