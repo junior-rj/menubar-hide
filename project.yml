@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.sparrow
   deploymentTarget:
     macOS: "14.0"
-  xcodeVersion: "16.0"
+  xcodeVersion: "26.0"
   createIntermediateGroups: true
   defaultConfig: Debug
   developmentLanguage: en
@@ -15,8 +15,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "1.4.3"
-    CURRENT_PROJECT_VERSION: "8"
+    MARKETING_VERSION: "1.5.0"
+    CURRENT_PROJECT_VERSION: "9"
     DEVELOPMENT_TEAM: "Q9KN4S5XHY"
 
 targets:
