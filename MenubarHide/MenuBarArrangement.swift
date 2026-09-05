@@ -10,8 +10,21 @@ import Foundation
 /// status windows all report Control Center as their owner, and apps that never
 /// set an autosaveName all share the key "Item-0" — useless for matching a
 /// window to an app, irrelevant here since we never need that mapping.
+///
+/// A domain is either a bundle id (plist under ~/Library/Preferences) or the
+/// absolute path of a sandboxed app's container plist: cfprefsd redirects
+/// sandboxed apps to ~/Library/Containers/<id>/Data/Library/Preferences, so
+/// their bundle id resolves to the wrong file from this unsandboxed process.
+/// CFPreferences accepts a path as the application id (like `defaults write
+/// /path/file.plist`), which keeps every read and write going through cfprefsd.
 enum MenuBarArrangement {
     typealias Snapshot = [String: [String: Double]]
+
+    struct RestoreResult {
+        var rewritten = 0
+        /// Domains whose CFPreferencesAppSynchronize reported failure.
+        var failedDomains = 0
+    }
 
     static let ownDomain = Bundle.main.bundleIdentifier ?? "com.sparrow.menubarhide"
 
@@ -59,6 +72,12 @@ enum MenuBarArrangement {
     @discardableResult
     static func captureAndSave() -> Int {
         let (fresh, domains) = capture()
+        guard !domains.isEmpty else {
+            // the preferences directory was unreadable: merging would drop every
+            // remembered domain and wipe the only backup right before a collapse
+            NSLog("menubar-hide: no preference domains readable, keeping the saved arrangement")
+            return savedCount()
+        }
         let merged = merge(saved: saved() ?? [:], fresh: fresh, liveDomains: domains)
         let defaults = UserDefaults.standard
         defaults.set(merged, forKey: snapshotKey)
@@ -67,8 +86,10 @@ enum MenuBarArrangement {
     }
 
     /// Pure half of the merge above, split out so it can be exercised without
-    /// touching cfprefsd or UserDefaults.
+    /// touching cfprefsd or UserDefaults. No live domains means nothing could
+    /// be read, not that every app vanished: the saved snapshot stays as is.
     static func merge(saved: Snapshot, fresh: Snapshot, liveDomains: Set<String>) -> Snapshot {
+        guard !liveDomains.isEmpty else { return saved }
         var merged = saved.filter { liveDomains.contains($0.key) }
         for (domain, values) in fresh {
             merged[domain, default: [:]].merge(values) { _, new in new }
@@ -79,35 +100,70 @@ enum MenuBarArrangement {
     // MARK: - Restore
 
     /// Writes remembered positions back into each owning app's domain.
-    /// Skips our own domain: the separator/chevron pair has its own pinning
-    /// rules in StatusBarController and must not be written twice.
     /// Only apps that create their status item AFTER this takes effect, so
     /// already-running apps move on their next launch.
     @discardableResult
-    static func restore(_ snapshot: Snapshot) -> Int {
-        var rewritten = 0
-        for (domain, positions) in snapshot where domain != ownDomain {
+    static func restore(_ snapshot: Snapshot) -> RestoreResult {
+        var result = RestoreResult()
+        for (domain, positions) in snapshot {
             var changed = false
-            for (key, value) in positions where isValid(value) {
+            for (key, value) in positions where isValid(value) && isRestorable(domain: domain, key: key) {
                 let current = CFPreferencesCopyValue(key as CFString, domain as CFString,
                                                      kCFPreferencesCurrentUser,
                                                      kCFPreferencesAnyHost) as? Double
                 guard current != value else { continue } // no churn for values already right
                 CFPreferencesSetValue(key as CFString, NSNumber(value: value), domain as CFString,
                                       kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
-                NSLog("menubar-hide: restored \(domain) [\(key)] \(String(describing: current)) -> \(value)")
                 changed = true
-                rewritten += 1
+                result.rewritten += 1
             }
-            if changed { CFPreferencesAppSynchronize(domain as CFString) }
+            if changed, !CFPreferencesAppSynchronize(domain as CFString) {
+                result.failedDomains += 1
+                NSLog("menubar-hide: could not synchronize a preference domain while restoring")
+            }
         }
-        return rewritten
+        // counts only: the domains are the user's installed-app inventory and
+        // the unified log is not the place for it
+        NSLog("menubar-hide: restore rewrote \(result.rewritten) positions, \(result.failedDomains) domains failed to sync")
+        return result
+    }
+
+    /// The snapshot lives in this app's own plist, which any process running as
+    /// the user can edit, so restore re-checks what capture guaranteed: only
+    /// status item keys, never the global domain, never a path outside the
+    /// user's app containers. Our own pair is pinned by StatusBarController and
+    /// must not be written twice.
+    static func isRestorable(domain: String, key: String, home: String = NSHomeDirectory()) -> Bool {
+        guard key.hasPrefix(keyPrefix), domain != ownDomain, !domain.hasPrefix(".") else { return false }
+        if domain.hasPrefix("/") {
+            return domain.hasPrefix(home + "/Library/Containers/") && !domain.contains("/../")
+        }
+        return !domain.contains("/")
     }
 
     // MARK: - Storage
 
     static func saved() -> Snapshot? {
-        UserDefaults.standard.dictionary(forKey: snapshotKey) as? Snapshot
+        guard let raw = UserDefaults.standard.dictionary(forKey: snapshotKey) else { return nil }
+        let decoded = decode(raw)
+        return decoded.isEmpty ? nil : decoded
+    }
+
+    /// Element-wise, so one malformed leaf costs one position, not the whole
+    /// backup (an all-or-nothing `as? Snapshot` would report "nothing saved"
+    /// and the next merge would start from scratch).
+    static func decode(_ raw: [String: Any]) -> Snapshot {
+        var snapshot: Snapshot = [:]
+        for (domain, entry) in raw {
+            guard let values = entry as? [String: Any] else { continue }
+            var positions: [String: Double] = [:]
+            for (key, value) in values {
+                guard let number = value as? NSNumber else { continue }
+                positions[key] = number.doubleValue
+            }
+            if !positions.isEmpty { snapshot[domain] = positions }
+        }
+        return snapshot
     }
 
     static func savedDate() -> Date? {
@@ -122,9 +178,22 @@ enum MenuBarArrangement {
         saved()?[ownDomain]?[key]
     }
 
+    static func containerPlistPath(home: String, containerID: String) -> String {
+        "\(home)/Library/Containers/\(containerID)/Data/Library/Preferences/\(containerID).plist"
+    }
+
+    /// Bundle ids for the plain domains plus the container plist path of every
+    /// sandboxed app. Listing the directory is the only enumeration available:
+    /// `CFPreferencesCopyApplicationList` is unavailable in the SDK.
     private static func preferenceDomains() -> [String] {
-        let dir = ("~/Library/Preferences" as NSString).expandingTildeInPath
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []
-        return files.filter { $0.hasSuffix(".plist") }.map { String($0.dropLast(6)) }
+        let home = NSHomeDirectory()
+        let fm = FileManager.default
+        let plain = ((try? fm.contentsOfDirectory(atPath: home + "/Library/Preferences")) ?? [])
+            .filter { $0.hasSuffix(".plist") }
+            .map { String($0.dropLast(6)) }
+        let containers = ((try? fm.contentsOfDirectory(atPath: home + "/Library/Containers")) ?? [])
+            .map { containerPlistPath(home: home, containerID: $0) }
+            .filter { fm.fileExists(atPath: $0) }
+        return plain + containers
     }
 }
