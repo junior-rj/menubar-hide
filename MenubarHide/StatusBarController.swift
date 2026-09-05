@@ -273,7 +273,11 @@ final class StatusBarController {
                 separatorItem.length = NSStatusItem.variableLength
                 try? await Task.sleep(for: .milliseconds(300))
                 items += await ItemCapturer.capture(missing)
-                separatorItem.length = Self.collapsedLength
+                // a manual expand during the flash (option-click, hotkey) owns
+                // the bar now; forcing the collapsed length back would leave
+                // isCollapsed false with the icons parked off-screen, and the
+                // next snapshot would remember the parked positions
+                if isCollapsed { separatorItem.length = Self.collapsedLength }
                 items.sort { $0.window.frame.minX < $1.window.frame.minX }
             }
             NSLog("menubar-hide: showing panel with \(items.count) items")

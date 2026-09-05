@@ -48,7 +48,10 @@ final class HiddenItemsPanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .transient]
         panel.isReleasedWhenClosed = false
 
-        let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
+        // the anchor is the toggle button, which always sits on the menu bar
+        // display; NSScreen.main is the display with keyboard focus, so the
+        // panel would be clamped to the wrong monitor when another one is active
+        let screen = Self.screenFrame(containing: anchorFrame, screens: NSScreen.screens.map(\.visibleFrame))
         let x = max(screen.minX + 4,
                     min(anchorFrame.maxX - panel.frame.width, screen.maxX - panel.frame.width - 4))
         panel.setFrameOrigin(NSPoint(x: x, y: anchorFrame.minY - panel.frame.height - 6))
@@ -74,6 +77,13 @@ final class HiddenItemsPanel {
         }) {
             monitors.append(monitor)
         }
+    }
+
+    /// The visible frame of the screen holding the anchor's centre; falls
+    /// back to the first screen (the one with the menu bar) when none does.
+    static func screenFrame(containing anchor: NSRect, screens: [NSRect]) -> NSRect {
+        let mid = NSPoint(x: anchor.midX, y: anchor.midY)
+        return screens.first { $0.minX <= mid.x && mid.x < $0.maxX } ?? screens.first ?? .zero
     }
 
     func close() {

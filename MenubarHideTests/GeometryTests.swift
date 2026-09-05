@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Testing
 
@@ -90,5 +91,25 @@ struct MenuBarStripTests {
     func noDisplays() {
         let item = CGRect(x: 1500, y: 0, width: 24, height: 24)
         #expect(!StatusBarController.isInStrip(item, displays: []))
+    }
+}
+
+@Suite("Panel screen selection")
+@MainActor
+struct PanelScreenTests {
+    // AppKit space: origin bottom-left of the main display
+    static let main = NSRect(x: 0, y: 0, width: 1710, height: 1080)
+    static let right = NSRect(x: 1710, y: 0, width: 1920, height: 1080)
+
+    @Test("the anchor picks its own screen, not the first one")
+    func anchorOnSecondScreen() {
+        let anchor = NSRect(x: 3000, y: 1055, width: 24, height: 24)
+        #expect(HiddenItemsPanel.screenFrame(containing: anchor, screens: [Self.main, Self.right]) == Self.right)
+    }
+
+    @Test("an anchor outside every screen falls back to the first")
+    func fallbackToFirst() {
+        let anchor = NSRect(x: -500, y: 1055, width: 24, height: 24)
+        #expect(HiddenItemsPanel.screenFrame(containing: anchor, screens: [Self.main, Self.right]) == Self.main)
     }
 }
