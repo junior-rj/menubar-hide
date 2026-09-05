@@ -22,8 +22,17 @@ enum MenuBarItemScanner {
     /// (<= screen width) while matching the clamped separator (~5016).
     private static let separatorMinWidth: CGFloat = 2_500
 
+    /// Largest gap between two neighbouring hidden icons; beyond it the run
+    /// has jumped to another display's copy of the bar.
+    private static let contiguityGap: CGFloat = 50
+
     static func hiddenItems() -> [MenuBarItemWindow] {
-        let windows = statusWindows()
+        hiddenItems(among: statusWindows())
+    }
+
+    /// Pure half of the discovery, split out so the shape heuristics can be
+    /// tested without a live window server.
+    static func hiddenItems(among windows: [MenuBarItemWindow]) -> [MenuBarItemWindow] {
         // our collapsed separator on the main menu bar = the rightmost huge
         // status window (a second display's bar has its own copy further left)
         guard let separator = windows
@@ -39,7 +48,7 @@ enum MenuBarItemScanner {
             .filter { $0.frame.maxX <= separator.frame.minX + 1 && $0.frame.width < separatorMinWidth }
             .sorted { $0.frame.maxX > $1.frame.maxX }
         for window in candidates {
-            guard edge - window.frame.maxX <= 50 else { break }
+            guard edge - window.frame.maxX <= contiguityGap else { break }
             result.append(window)
             edge = window.frame.minX
         }
