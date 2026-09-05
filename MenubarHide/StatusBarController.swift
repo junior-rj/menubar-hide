@@ -7,6 +7,12 @@ final class StatusBarController {
     // status item to its left off-screen. Never use isVisible — removing an
     // item loses its autosaved position.
     private static let collapsedLength: CGFloat = 10_000
+    /// Both pollers sample the status layer every 2s. The launch poller wants
+    /// three identical readings (login storm); the post-expand snapshot two.
+    private static let initialStablePolls = 3
+    private static let initialMaxPolls = 60 // ~120s
+    private static let snapshotStablePolls = 2
+    private static let snapshotMaxPolls = 30 // ~60s
     private static let showInPanelKey = "showInPanel"
 
     private let toggleItem: NSStatusItem
@@ -18,6 +24,9 @@ final class StatusBarController {
     private var snapshotTask: Task<Void, Never>?
     private var isOpeningPanel = false
     private(set) var isCollapsed = false
+    /// Set by the AppDelegate once the Carbon registration is known; false
+    /// means ⌃⌥H is taken by another app and the menu says so.
+    var hotkeyAvailable = true
 
     private var showInPanel: Bool {
         get { UserDefaults.standard.bool(forKey: Self.showInPanelKey) }
@@ -46,8 +55,8 @@ final class StatusBarController {
         // positions before the owning apps register their items — which is why
         // this runs at launch, ahead of everything else.
         if let snapshot = MenuBarArrangement.saved() {
-            let rewritten = MenuBarArrangement.restore(snapshot)
-            NSLog("menubar-hide: restored arrangement, rewrote \(rewritten) of \(MenuBarArrangement.savedCount()) remembered positions")
+            let result = MenuBarArrangement.restore(snapshot)
+            NSLog("menubar-hide: restored arrangement, rewrote \(result.rewritten) of \(MenuBarArrangement.savedCount()) remembered positions")
         }
 
         let storedToggle = defaults.object(forKey: toggleKey) as? Double
@@ -110,12 +119,12 @@ final class StatusBarController {
             guard (try? await Task.sleep(for: .milliseconds(500))) != nil else { return } // let the first layout settle
             var fingerprint = Set<String>()
             var stablePolls = 0
-            for poll in 0..<60 { // 2s each: cap the wait at ~120s
+            for poll in 0..<Self.initialMaxPolls {
                 guard let self, !self.isCollapsed, !Task.isCancelled else { return }
                 let current = MenuBarItemScanner.statusItemFingerprint()
                 if current == fingerprint {
                     stablePolls += 1
-                    if stablePolls >= 3 {
+                    if stablePolls >= Self.initialStablePolls {
                         NSLog("menubar-hide: menu bar stable after \(poll + 1) polls, collapsing")
                         self.collapse()
                         return
@@ -161,6 +170,17 @@ final class StatusBarController {
         scheduleArrangementSnapshot()
     }
 
+    /// Quitting while collapsed would leave every hidden icon parked off-screen
+    /// with its owner autosaving that position; the next launch repairs it, but
+    /// an uninstall would not. Just the length change: no snapshot, no pollers.
+    func expandForQuit() {
+        guard isCollapsed else { return }
+        stateWillChange()
+        panel.close()
+        separatorItem.length = NSStatusItem.variableLength
+        isCollapsed = false
+    }
+
     /// Reads every app's stored icon position and merges it into our snapshot.
     /// 73ms on the first call, 2ms afterwards (cfprefsd caches), so it runs
     /// inline — it has to, since the collapse right after it would spoil what
@@ -183,9 +203,11 @@ final class StatusBarController {
         snapshotTask = Task { @MainActor [weak self] in
             var fingerprint = Set<String>()
             var stablePolls = 0
-            for _ in 0..<30 where stablePolls < 2 { // cap the wait at ~60s
+            var polls = 0
+            while stablePolls < Self.snapshotStablePolls, polls < Self.snapshotMaxPolls {
                 guard (try? await Task.sleep(for: .seconds(2))) != nil else { return }
                 guard let self, !self.isCollapsed, !Task.isCancelled else { return }
+                polls += 1
                 let current = MenuBarItemScanner.statusItemFingerprint()
                 if current == fingerprint {
                     stablePolls += 1
@@ -194,7 +216,8 @@ final class StatusBarController {
                     fingerprint = current
                 }
             }
-            self?.captureArrangement(reason: "expanded and stable")
+            let reason = stablePolls >= Self.snapshotStablePolls ? "expanded and stable" : "expanded, never stabilized"
+            self?.captureArrangement(reason: reason)
         }
     }
 
@@ -280,6 +303,13 @@ final class StatusBarController {
                 if isCollapsed { separatorItem.length = Self.collapsedLength }
                 items.sort { $0.window.frame.minX < $1.window.frame.minX }
             }
+            // a manual expand or a mode switch during the flash owns the bar
+            // now; showing the panel would duplicate icons that are back on it
+            guard isCollapsed, showInPanel else {
+                NSLog("menubar-hide: bar expanded during capture, not showing the panel")
+                return
+            }
+            let anchorFrame = toggleItem.button?.window?.frame ?? anchorFrame
             NSLog("menubar-hide: showing panel with \(items.count) items")
             panel.show(items: items, below: anchorFrame) { [weak self] item in
                 self?.forwardClick(to: item)
@@ -302,10 +332,14 @@ final class StatusBarController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             // the bar relayouts asynchronously; retry until the item lands on-screen
+            // X is the same in CG and AppKit space, so the button's window
+            // frame bounds the hidden side without a coordinate flip
+            let toggleMinX = toggleItem.button?.window?.frame.minX ?? -.infinity
             var frame: CGRect?
             for _ in 0..<3 {
                 try? await Task.sleep(for: .milliseconds(150))
-                if let found = MenuBarItemScanner.frame(of: item.id), Self.isInMenuBarStrip(found) {
+                if let found = MenuBarItemScanner.frame(of: item.id),
+                   Self.isInMenuBarStrip(found), Self.isOnHiddenSide(found, toggleMinX: toggleMinX) {
                     frame = found
                     break
                 }
@@ -355,15 +389,33 @@ final class StatusBarController {
         }
     }
 
-    private func showPermissionAlert(message: String, informative: String,
-                                     settingsAnchor: String, beforeOpeningSettings: () -> Void) {
+    /// The strip check bounds where a click may land; this bounds which side.
+    /// The target is re-resolved by window id right before posting, and a
+    /// status-layer window can move between capture and click: anything that
+    /// migrated to the right of the toggle (over Control Center, the clock,
+    /// another vendor's item) is not one of ours to click.
+    static func isOnHiddenSide(_ frame: CGRect, toggleMinX: CGFloat) -> Bool {
+        frame.maxX <= toggleMinX
+    }
+
+    /// Every dialog goes through here: LSUIElement apps need the activate
+    /// call for runModal to come to the front, and forgetting it in one copy
+    /// of the boilerplate is exactly how it went missing once.
+    @discardableResult
+    private func runAlert(message: String, informative: String, buttons: [String]) -> NSApplication.ModalResponse {
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = informative
-        alert.addButton(withTitle: String(localized: "Open System Settings"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        NSApp.activate(ignoringOtherApps: true) // LSUIElement apps need this for runModal
-        if alert.runModal() == .alertFirstButtonReturn {
+        for title in buttons { alert.addButton(withTitle: title) }
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal()
+    }
+
+    private func showPermissionAlert(message: String, informative: String,
+                                     settingsAnchor: String, beforeOpeningSettings: () -> Void) {
+        let response = runAlert(message: message, informative: informative,
+                                buttons: [String(localized: "Open System Settings"), String(localized: "Cancel")])
+        if response == .alertFirstButtonReturn {
             // system prompt fires here, right as Settings opens — it also
             // registers the app in the permission list, unlike the deep link
             beforeOpeningSettings()
@@ -380,15 +432,16 @@ final class StatusBarController {
         autoCollapseTask?.cancel()
         autoCollapseTask = Task { @MainActor [weak self] in
             guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return } // skip our synthetic click
-            guard let self, !self.isCollapsed else { return }
-            if self.autoCollapseMonitor == nil {
-                self.autoCollapseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
+            guard let controller = self, !controller.isCollapsed else { return }
+            if controller.autoCollapseMonitor == nil {
+                controller.autoCollapseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
                     MainActor.assumeIsolated { self?.finishAutoCollapse() }
                 }
                 NSLog("menubar-hide: auto-collapse armed")
             }
+            // not held across the 15s wait: re-acquire weakly on the other side
             guard (try? await Task.sleep(for: .seconds(15))) != nil else { return }
-            self.finishAutoCollapse()
+            self?.finishAutoCollapse()
         }
     }
 
@@ -419,6 +472,13 @@ final class StatusBarController {
         panelItem.state = showInPanel ? .on : .off
         menu.addItem(panelItem)
 
+        if !hotkeyAvailable {
+            let hotkeyItem = NSMenuItem(title: String(localized: "⌃⌥H unavailable (taken by another app)"),
+                                        action: nil, keyEquivalent: "")
+            hotkeyItem.isEnabled = false
+            menu.addItem(hotkeyItem)
+        }
+
         let loginItem = NSMenuItem(title: String(localized: "Launch at Login"),
                                    action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.target = self
@@ -433,6 +493,7 @@ final class StatusBarController {
         menu.addItem(NSMenuItem(title: String(localized: "Quit MenubarHide"),
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
+        menu.autoenablesItems = false // the hotkey notice has no target and must stay disabled
         // Assign, click, unassign — keeps left-click free for toggle()
         toggleItem.menu = menu
         toggleItem.button?.performClick(nil)
@@ -483,17 +544,21 @@ final class StatusBarController {
 
     @objc private func restoreArrangement() {
         guard let snapshot = MenuBarArrangement.saved() else { return }
-        let rewritten = MenuBarArrangement.restore(snapshot)
-        let alert = NSAlert()
-        alert.messageText = rewritten == 0
+        let result = MenuBarArrangement.restore(snapshot)
+        guard result.failedDomains == 0 else {
+            runAlert(message: String(localized: "Some positions could not be restored"),
+                     informative: String(localized: "macOS refused to save the position for \(result.failedDomains) apps. Their icons keep their current place."),
+                     buttons: [String(localized: "OK")])
+            return
+        }
+        let message = result.rewritten == 0
             ? String(localized: "Every icon is already where you left it")
-            : String(localized: "Restored \(rewritten) icon positions")
+            : String(localized: "Restored \(result.rewritten) icon positions")
         // AppKit reads the preferred position when an app creates its status
         // item, so nothing moves until the owning app launches again
-        alert.informativeText = String(localized: "Icons of apps that are already running move back on their next launch, or after you log out and back in.")
-        alert.addButton(withTitle: String(localized: "OK"))
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        runAlert(message: message,
+                 informative: String(localized: "Icons of apps that are already running move back on their next launch, or after you log out and back in."),
+                 buttons: [String(localized: "OK")])
     }
 
     // MARK: - Menu bar spacing menu
@@ -531,17 +596,17 @@ final class StatusBarController {
     }
 
     @objc private func spacingPresetChosen(_ sender: NSMenuItem) {
-        MenuBarSpacing.apply(sender.tag)
-        showSpacingNotice()
+        showSpacingNotice(applied: MenuBarSpacing.apply(sender.tag))
     }
 
     @objc private func chooseCustomSpacing() {
         let range = MenuBarSpacing.allowedRange
         let alert = NSAlert()
         alert.messageText = String(localized: "Custom menu bar spacing")
-        alert.informativeText = String(localized: "Space around each menu bar icon, in points (\(range.lowerBound)–\(range.upperBound)). Smaller values fit more icons; the macOS default is around 12.")
+        alert.informativeText = String(localized: "Space around each menu bar icon, in points (\(range.lowerBound)–\(range.upperBound)). Smaller values fit more icons; the macOS default is around \(MenuBarSpacing.systemDefault).")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 60, height: 24))
-        field.stringValue = String(MenuBarSpacing.current() ?? 12)
+        // plain digits on purpose: Int(...) below parses the same text back
+        field.stringValue = String(MenuBarSpacing.current() ?? MenuBarSpacing.systemDefault)
         alert.accessoryView = field
         alert.addButton(withTitle: String(localized: "Apply"))
         alert.addButton(withTitle: String(localized: "Cancel"))
@@ -550,31 +615,30 @@ final class StatusBarController {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         guard let value = Int(field.stringValue.trimmingCharacters(in: .whitespaces)),
               range.contains(value) else {
-            let error = NSAlert()
-            error.messageText = String(localized: "Spacing not changed")
-            error.informativeText = String(localized: "Enter a whole number between \(range.lowerBound) and \(range.upperBound).")
-            error.addButton(withTitle: String(localized: "OK"))
-            error.runModal()
+            runAlert(message: String(localized: "Spacing not changed"),
+                     informative: String(localized: "Enter a whole number between \(range.lowerBound) and \(range.upperBound)."),
+                     buttons: [String(localized: "OK")])
             return
         }
-        MenuBarSpacing.apply(value)
-        showSpacingNotice()
+        showSpacingNotice(applied: MenuBarSpacing.apply(value))
     }
 
     @objc private func resetSpacing() {
-        MenuBarSpacing.reset()
-        showSpacingNotice()
+        showSpacingNotice(applied: MenuBarSpacing.reset())
     }
 
     /// Every app reads the spacing when it builds its status items, so only a
     /// full logout (or restart) rebuilds the whole bar.
-    private func showSpacingNotice() {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Log out to apply the new spacing")
-        alert.informativeText = String(localized: "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change.")
-        alert.addButton(withTitle: String(localized: "OK"))
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+    private func showSpacingNotice(applied: Bool) {
+        guard applied else {
+            runAlert(message: String(localized: "Spacing not changed"),
+                     informative: String(localized: "macOS refused to save the global menu bar spacing."),
+                     buttons: [String(localized: "OK")])
+            return
+        }
+        runAlert(message: String(localized: "Log out to apply the new spacing"),
+                 informative: String(localized: "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change."),
+                 buttons: [String(localized: "OK")])
     }
 
     @objc private func openAbout() {
@@ -606,7 +670,12 @@ final class StatusBarController {
                 }
             }
         } catch {
-            NSLog("Launch at Login change failed: \(error)")
+            NSLog("menubar-hide: Launch at Login change failed: \(error)")
+            // SMAppServiceErrorDomain 1 is the usual: app not in /Applications
+            runAlert(message: String(localized: "Launch at Login could not be changed"),
+                     informative: String(localized: "macOS refused the change. Move MenubarHide to the Applications folder and try again, or manage it in System Settings › General › Login Items."),
+                     buttons: [String(localized: "OK")])
+            SMAppService.openSystemSettingsLoginItems()
         }
     }
 }

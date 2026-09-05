@@ -121,22 +121,22 @@
         }
       }
     },
+    "Launch at Login could not be changed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível alterar o Iniciar com o Sistema"
+          }
+        }
+      }
+    },
     "Log out to apply the new spacing" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Encerre a sessão para aplicar o novo espaçamento"
-          }
-        }
-      }
-    },
-    "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O macOS só lê o espaçamento da barra de menus quando os apps abrem. Encerre e inicie a sessão de novo, ou reinicie o Mac, para ver a mudança."
           }
         }
       }
@@ -293,10 +293,40 @@
     },
     "Saved %@ · %lld icons" : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Saved %@ · %lld icon"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Saved %@ · %lld icons"
+                }
+              }
+            }
+          }
+        },
         "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salvo em %@ · %lld ícones"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Salvo em %@ · %lld ícone"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Salvo em %@ · %lld ícones"
+                }
+              }
+            }
           }
         }
       }
@@ -331,12 +361,22 @@
         }
       }
     },
-    "Space around each menu bar icon, in points (%lld–%lld). Smaller values fit more icons; the macOS default is around 12." : {
+    "Some positions could not be restored" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Espaço ao redor de cada ícone da barra de menus, em pontos (%lld–%lld). Valores menores cabem mais ícones; o padrão do macOS é cerca de 12."
+            "value" : "Algumas posições não puderam ser restauradas"
+          }
+        }
+      }
+    },
+    "Space around each menu bar icon, in points (%lld–%lld). Smaller values fit more icons; the macOS default is around %lld." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espaço ao redor de cada ícone da menu bar, em pontos (%lld–%lld). Valores menores cabem mais ícones; o padrão do macOS fica em torno de %lld."
           }
         }
       }
@@ -347,6 +387,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Espaçamento não alterado"
+          }
+        }
+      }
+    },
+    "macOS only picks up the menu bar spacing when apps launch. Log out and back in, or restart your Mac, to see the change." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O macOS só lê o espaçamento da barra de menus quando os apps abrem. Encerre e inicie a sessão de novo, ou reinicie o Mac, para ver a mudança."
+          }
+        }
+      }
+    },
+    "macOS refused the change. Move MenubarHide to the Applications folder and try again, or manage it in System Settings › General › Login Items." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O macOS recusou a alteração. Mova o MenubarHide para a pasta Aplicativos e tente de novo, ou gerencie em Ajustes do Sistema › Geral › Itens de Início."
+          }
+        }
+      }
+    },
+    "macOS refused to save the global menu bar spacing." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O macOS recusou salvar o espaçamento global da menu bar."
+          }
+        }
+      }
+    },
+    "macOS refused to save the position for %lld apps. Their icons keep their current place." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "macOS refused to save the position for %lld app. Its icon keeps its current place."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "macOS refused to save the position for %lld apps. Their icons keep their current place."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "O macOS recusou salvar a posição de %lld app. O ícone dele fica onde está."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "O macOS recusou salvar a posição de %lld apps. Os ícones deles ficam onde estão."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "⌃⌥H unavailable (taken by another app)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃⌥H indisponível (em uso por outro app)"
           }
         }
       }

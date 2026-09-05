@@ -19,6 +19,7 @@ private final class FirstMouseHostingView<Content: View>: NSHostingView<Content>
 final class HiddenItemsPanel {
     private var panel: NSPanel?
     private var monitors: [Any] = []
+    private static let edgeInset: CGFloat = 4
 
     var isVisible: Bool { panel?.isVisible ?? false }
 
@@ -37,7 +38,16 @@ final class HiddenItemsPanel {
         })
         hosting.setFrameSize(hosting.fittingSize)
 
-        let panel = ClickablePanel(contentRect: NSRect(origin: .zero, size: hosting.frame.size),
+        // the anchor is the toggle button, which always sits on the menu bar
+        // display; NSScreen.main is the display with keyboard focus, so the
+        // panel would be clamped to the wrong monitor when another one is active
+        let screen = Self.screenFrame(containing: anchorFrame, screens: NSScreen.screens.map(\.visibleFrame))
+        // a panel wider than the display would otherwise be pushed off its right edge
+        var size = hosting.frame.size
+        size.width = min(size.width, screen.width - 2 * Self.edgeInset)
+        hosting.setFrameSize(size)
+
+        let panel = ClickablePanel(contentRect: NSRect(origin: .zero, size: size),
                                    styleMask: [.borderless, .nonactivatingPanel],
                                    backing: .buffered, defer: false)
         panel.contentView = hosting
@@ -48,12 +58,8 @@ final class HiddenItemsPanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .transient]
         panel.isReleasedWhenClosed = false
 
-        // the anchor is the toggle button, which always sits on the menu bar
-        // display; NSScreen.main is the display with keyboard focus, so the
-        // panel would be clamped to the wrong monitor when another one is active
-        let screen = Self.screenFrame(containing: anchorFrame, screens: NSScreen.screens.map(\.visibleFrame))
-        let x = max(screen.minX + 4,
-                    min(anchorFrame.maxX - panel.frame.width, screen.maxX - panel.frame.width - 4))
+        let x = max(screen.minX + Self.edgeInset,
+                    min(anchorFrame.maxX - panel.frame.width, screen.maxX - panel.frame.width - Self.edgeInset))
         panel.setFrameOrigin(NSPoint(x: x, y: anchorFrame.minY - panel.frame.height - 6))
         panel.orderFrontRegardless()
         panel.makeKey() // Esc and buttons need key status; does not activate the app
@@ -101,7 +107,7 @@ private struct PanelContentView: View {
     var body: some View {
         HStack(spacing: 2) {
             if items.isEmpty {
-                Text("No hidden icons")
+                Text(String(localized: "No hidden icons"))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
             }

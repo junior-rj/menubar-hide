@@ -113,3 +113,26 @@ struct PanelScreenTests {
         #expect(HiddenItemsPanel.screenFrame(containing: anchor, screens: [Self.main, Self.right]) == Self.main)
     }
 }
+
+@Suite("Click target must stay on the hidden side of the toggle")
+@MainActor
+struct HiddenSideTests {
+    @Test("an item left of the toggle button passes")
+    func leftOfToggle() {
+        let item = CGRect(x: 1200, y: 0, width: 24, height: 24)
+        #expect(StatusBarController.isOnHiddenSide(item, toggleMinX: 1500))
+    }
+
+    @Test("a window that migrated right of the toggle is rejected")
+    func rightOfToggle() {
+        // a status-layer window that moved over Control Center between capture and click
+        let item = CGRect(x: 1600, y: 0, width: 24, height: 24)
+        #expect(!StatusBarController.isOnHiddenSide(item, toggleMinX: 1500))
+    }
+
+    @Test("overlapping the toggle is rejected")
+    func overlapsToggle() {
+        let item = CGRect(x: 1490, y: 0, width: 24, height: 24)
+        #expect(!StatusBarController.isOnHiddenSide(item, toggleMinX: 1500))
+    }
+}

@@ -26,6 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusBar = StatusBarController()
         NSLog("menubar-hide: StatusBarController created")
         self.statusBar = statusBar
-        hotkey = HotkeyManager { statusBar.toggle() }
+        let hotkey = HotkeyManager { statusBar.toggle() }
+        self.hotkey = hotkey
+        statusBar.hotkeyAvailable = hotkey.isRegistered
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // leaving the bar collapsed would park every hidden icon off-screen for
+        // its owner to autosave; give the layout back before going away
+        statusBar?.expandForQuit()
     }
 }
