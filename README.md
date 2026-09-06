@@ -120,7 +120,7 @@ xcodegen
 xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build
 ```
 
-`project.yml` is the source of truth; the `.xcodeproj` is generated and gitignored. `scripts/release.sh` is a thin wrapper around a release flow that lives outside this repository (signing, notarization, DMG); to release your own build, sign and notarize with your team's Developer ID.
+`project.yml` is the source of truth; the `.xcodeproj` is generated and gitignored. Signed releases (signing, notarization, DMG) are produced by the author's own tooling; to release your own build, sign and notarize with your team's Developer ID.
 
 > Tip: features that need permissions (the panel) must be tested on the build installed in `/Applications` — macOS invalidates TCC grants when the code signature changes between Debug and Release builds.
 

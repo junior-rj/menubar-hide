@@ -32,7 +32,7 @@ App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/
 - MenubarHide/MenuBarArrangement.swift — snapshot e restauração das posições de todos os ícones via CFPreferences
 - MenubarHide/MenuBarSpacing.swift — leitura e escrita das duas chaves globais de espaçamento
 - MenubarHide/Localizable.xcstrings — String Catalog com toda a UI em EN e pt-BR (InfoPlist.xcstrings traduz o copyright do painel About)
-- scripts/release.sh — DMG assinado (Developer ID) e notarizado; desde 31/08/2026 é um wrapper de config: o fluxo mora no compartilhado `sparrow_workspace/scripts/release-macos.sh` (build fora do repo, ExportOptions gerado de `TEAM_ID`, saída em `build/MenubarHide.dmg` + `build/export/MenubarHide-stapled.app`); o perfil de notary vem da variável `NOTARY_PROFILE` (perfil do keychain criado com `notarytool store-credentials`)
+- Release pela skill global `release-macos` (desde 05/09/2026; o wrapper `scripts/release.sh` saiu). Um comando faz build fora do repo, Developer ID, DMG, notarização, staple, instala em /Applications e publica. Config inferida do repo, sem override. Saída `build/MenubarHide-X.Y.Z.dmg` + `build/export/MenubarHide-stapled.app`; perfil de notary `sparrow-notary` do keychain
 
 ## Regras específicas
 - Pegadinhas do macOS 26 Tahoe (custaram a depuração da v1, não regredir):
@@ -66,13 +66,5 @@ App macOS pra ocultar ícones da menu bar quando ela lota: um separador expande/
 - Trocar a assinatura do app instalado (dev ↔ Developer ID) invalida as permissões TCC; reconceder Gravação de Tela e Acessibilidade
 - Build: `xcodegen && xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -configuration Debug build`
 - Testes: `xcodebuild -project MenubarHide.xcodeproj -scheme MenubarHide -destination 'platform=macOS' test` (Swift Testing, target MenubarHideTests; o AppDelegate pula a inicialização sob XCTest pra não mexer na menu bar real)
-- Release: `./scripts/release.sh` (gera build/MenubarHide.dmg notarizado)
-- **Entrega não termina no build verde, nem no DMG notarizado.** Mudança de código concluída são SETE passos, todos parte do plano. Entregar pela metade e listar o resto como pendência não é entrega:
-  1. Bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml (patch pra correção interna, minor pra feature visível)
-  2. `xcodebuild ... test` verde
-  3. `./scripts/release.sh` (assina, notariza, grampeia)
-  4. Commit em Conventional Commits, direto na main (é o padrão do histórico deste repo, não abrir branch pra release)
-  5. Tag `vX.Y.Z` anotada e `git push origin main --follow-tags`
-  6. `gh release create vX.Y.Z build/MenubarHide.dmg` com notas em INGLÊS, no estilo das anteriores (frase de abertura, bullets, fechamento "Signed with Developer ID and notarized by Apple. Requires macOS 14+."). A v1.4.0 ficou taggeada sem release no GitHub por esquecer este passo; a v1.4.1 saiu em português porque esta regra dizia o contrário (corrigida em 2026-08-27)
-  7. Instalar em `/Applications`: encerrar o app, `ditto --noextattr --norsrc build/export/MenubarHide-stapled.app /Applications/MenubarHide.app`, relançar. Sem `rm` nem `mv`, e a assinatura Developer ID igual preserva o TCC
+- **Entrega não termina no build verde, nem no DMG notarizado.** Mudança de código concluída são: (1) bump de `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` no project.yml (patch pra correção interna, minor pra feature visível), (2) `xcodebuild ... test` verde, (3) commit em Conventional Commits, direto na main (padrão do histórico deste repo, não abrir branch pra release), (4) release pela skill `release-macos`, que assina, notariza, grampeia, instala em /Applications e publica num comando. Entregar pela metade e listar o resto como pendência não é entrega. As notas do release vão em INGLÊS, no estilo das anteriores (abertura, bullets, fechamento "Signed with Developer ID and notarized by Apple. Requires macOS 14+."); a v1.4.0 ficou taggeada sem release por esquecer o passo e a v1.4.1 saiu em português por engano (corrigido em 2026-08-27). A skill instala com a MESMA assinatura Developer ID, o que preserva o TCC.
 - Repo público: documento interno, nota de processo e relatório em português não entram no tree. Nota de trabalho fica no `CLAUDE.local.md` (carregado junto com este arquivo, ignorado pelo git); relatório vai pro workspace. O que não deve subir entra no `.gitignore` no momento da decisão
