@@ -9,3 +9,8 @@ xcuserdata/
 CLAUDE.local.md
 auditoria*.md
 .claude/settings.local.json
+
+# artefatos do impeccable (contexto de design interno)
+PRODUCT.md
+DESIGN.md
+.impeccable/

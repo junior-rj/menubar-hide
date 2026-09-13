@@ -96,6 +96,7 @@ final class StatusBarController {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         separatorItem.button?.image = symbol("number")
+        separatorItem.button?.setAccessibilityLabel(String(localized: "Menu bar separator"))
 
         updateToggleIcon()
         scheduleInitialCollapse()
@@ -245,6 +246,10 @@ final class StatusBarController {
 
     private func updateToggleIcon() {
         toggleItem.button?.image = symbol(isCollapsed ? "plus" : "minus")
+        // The +/- glyph is the only visual cue; VoiceOver needs the state in words.
+        toggleItem.button?.setAccessibilityLabel(isCollapsed
+            ? String(localized: "Show hidden menu bar icons")
+            : String(localized: "Hide menu bar icons"))
     }
 
     private func symbol(_ name: String) -> NSImage? {
@@ -648,7 +653,7 @@ final class StatusBarController {
             string: "github.com/junior-rj/menubar-hide",
             attributes: [
                 .link: URL(string: "https://github.com/junior-rj/menubar-hide")!,
-                .font: NSFont.systemFont(ofSize: 11),
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
             ])
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }

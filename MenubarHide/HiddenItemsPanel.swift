@@ -104,25 +104,52 @@ private struct PanelContentView: View {
     let items: [CapturedItem]
     let onClick: (CapturedItem) -> Void
 
+    // A menu-bar status item is ~22 pt tall; matching it keeps the empty and
+    // populated panel the same height, so toggling panel mode with nothing
+    // hidden does not collapse the strip into a thin pill.
+    private static let contentHeight: CGFloat = 22
+
     var body: some View {
         HStack(spacing: 2) {
             if items.isEmpty {
                 Text(String(localized: "No hidden icons"))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
             }
             ForEach(items) { item in
-                Button {
-                    onClick(item)
-                } label: {
-                    Image(nsImage: item.image)
-                }
-                .buttonStyle(.plain)
-                .help(item.window.ownerName)
+                PanelItemButton(item: item, onClick: onClick)
             }
         }
+        .frame(minHeight: Self.contentHeight)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// A menu-bar icon in a plain button gives no sign it is clickable. Following
+// the Control Center convention, hovering tints the item with the system
+// accent color, which adapts to the user's accent and to light/dark on its own.
+private struct PanelItemButton: View {
+    let item: CapturedItem
+    let onClick: (CapturedItem) -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button {
+            onClick(item)
+        } label: {
+            Image(nsImage: item.image)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.accentColor.opacity(isHovering ? 0.18 : 0))
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(item.window.ownerName)
+        // The label is a bitmap of another app's icon; name it for VoiceOver.
+        .accessibilityLabel(item.window.ownerName)
     }
 }
