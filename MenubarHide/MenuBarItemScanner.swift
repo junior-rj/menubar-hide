@@ -18,6 +18,13 @@ struct CapturedItem: Identifiable {
 // find the huge separator window, then take the contiguous run of icons
 // sitting immediately left of it.
 enum MenuBarItemScanner {
+    /// macOS 27 composites every status item into one "Menubar" window owned
+    /// by MenuBarAgent: the status layer is empty, so discovery, capture, click
+    /// forwarding and the per-app position keys are all gone there.
+    static func supportsPerItemWindows(majorVersion: Int) -> Bool { majorVersion < 27 }
+    static let isPerItemWindowModelAvailable =
+        supportsPerItemWindows(majorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion)
+
     /// ponytail: 2500 clears real icons and full-bar overlays like NotchNook
     /// (<= screen width) while matching the clamped separator (~5016).
     private static let separatorMinWidth: CGFloat = 2_500

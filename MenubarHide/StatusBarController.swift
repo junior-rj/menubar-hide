@@ -4,9 +4,17 @@ import ServiceManagement
 @MainActor
 final class StatusBarController {
     // Hidden Bar technique: expanding the separator's length pushes every
-    // status item to its left off-screen. Never use isVisible — removing an
-    // item loses its autosaved position.
-    private static let collapsedLength: CGFloat = 10_000
+    // status item to its left off-screen (macOS 26 and earlier; never use
+    // isVisible there, removing an item loses its autosaved position).
+    // macOS 27 discards an item that reaches the display's cliff instead, so
+    // the separator stays under it and zero-length spacers inflate with it;
+    // what they displace lands in the system's own « overflow menu. The
+    // numbers live in CollapsedGeometry.
+    private static let legacyModel = MenuBarItemScanner.isPerItemWindowModelAvailable
+    /// macOS 27: the status layer is empty, so there is no fingerprint to
+    /// watch, and with positions kept by MenuBarAgent we can no longer corrupt
+    /// anyone's saved position, so the login-storm wait has nothing to guard.
+    private static let initialCollapseDelay: Duration = .seconds(2)
     /// Both pollers sample the status layer every 2s. The launch poller wants
     /// three identical readings (login storm); the post-expand snapshot two.
     private static let initialStablePolls = 3
@@ -17,6 +25,10 @@ final class StatusBarController {
 
     private let toggleItem: NSStatusItem
     private let separatorItem: NSStatusItem
+    /// macOS 27 only, empty elsewhere: sit between separator and chevron.
+    private let spacerItems: [NSStatusItem]
+    private let separatorGlyph: NSImage?
+    private var screenObserver: NSObjectProtocol?
     private let panel = HiddenItemsPanel()
     private var autoCollapseMonitor: Any?
     private var autoCollapseTask: Task<Void, Never>?
@@ -46,60 +58,93 @@ final class StatusBarController {
         // new positions as hidden/visible. Fall back to the defaults (larger
         // value = further left, separator 265 left of chevron 250) on first
         // launch or when the stored value shows off-screen parking damage.
-        let defaults = UserDefaults.standard
-        let toggleKey = "NSStatusItem Preferred Position menubarhide_toggle"
-        let separatorKey = "NSStatusItem Preferred Position menubarhide_separator"
+        // macOS 27 keeps every position in MenuBarAgent's own table and never
+        // writes the per-app keys again, so pinning and restoring are 26-only.
+        if Self.legacyModel {
+            let defaults = UserDefaults.standard
+            let toggleKey = "NSStatusItem Preferred Position menubarhide_toggle"
+            let separatorKey = "NSStatusItem Preferred Position menubarhide_separator"
 
-        // Everyone else's icons keep their position in THEIR app's domain, so
-        // putting the bar back the way the user arranged it means writing those
-        // positions before the owning apps register their items — which is why
-        // this runs at launch, ahead of everything else.
-        if let snapshot = MenuBarArrangement.saved() {
-            let result = MenuBarArrangement.restore(snapshot)
-            NSLog("menubar-hide: restored arrangement, rewrote \(result.rewritten) of \(MenuBarArrangement.savedCount()) remembered positions")
-        }
+            // Everyone else's icons keep their position in THEIR app's domain, so
+            // putting the bar back the way the user arranged it means writing those
+            // positions before the owning apps register their items — which is why
+            // this runs at launch, ahead of everything else.
+            if let snapshot = MenuBarArrangement.saved() {
+                let result = MenuBarArrangement.restore(snapshot)
+                NSLog("menubar-hide: restored arrangement, rewrote \(result.rewritten) of \(MenuBarArrangement.savedCount()) remembered positions")
+            }
 
-        let storedToggle = defaults.object(forKey: toggleKey) as? Double
-        let storedSeparator = defaults.object(forKey: separatorKey) as? Double
-        let togglePos: Double, separatorPos: Double
-        // separator must stay left of (= greater than) the chevron; a swapped
-        // pair is scramble damage and re-pinning it would swallow the chevron
-        // on every launch, so reset BOTH — a half-reset recreates the swap
-        if let t = storedToggle, let s = storedSeparator, Self.isSanePair(toggle: t, separator: s) {
-            (togglePos, separatorPos) = (t, s)
-            NSLog("menubar-hide: pinned positions toggle=\(t) separator=\(s)")
-        } else if let t = MenuBarArrangement.savedOwnPosition(toggleKey),
-                  let s = MenuBarArrangement.savedOwnPosition(separatorKey),
-                  Self.isSanePair(toggle: t, separator: s) {
-            // damaged pair, but the snapshot still holds the last sane one:
-            // prefer it over the constants, which would shift the separator and
-            // silently reclassify every icon between the two positions
-            (togglePos, separatorPos) = (t, s)
-            NSLog("menubar-hide: pinned positions from snapshot toggle=\(t) separator=\(s)")
-        } else {
-            (togglePos, separatorPos) = (250, 265)
-            NSLog("menubar-hide: resetting positions to defaults (stored toggle=\(String(describing: storedToggle)) separator=\(String(describing: storedSeparator)))")
+            let storedToggle = defaults.object(forKey: toggleKey) as? Double
+            let storedSeparator = defaults.object(forKey: separatorKey) as? Double
+            let togglePos: Double, separatorPos: Double
+            // separator must stay left of (= greater than) the chevron; a swapped
+            // pair is scramble damage and re-pinning it would swallow the chevron
+            // on every launch, so reset BOTH — a half-reset recreates the swap
+            if let t = storedToggle, let s = storedSeparator, Self.isSanePair(toggle: t, separator: s) {
+                (togglePos, separatorPos) = (t, s)
+                NSLog("menubar-hide: pinned positions toggle=\(t) separator=\(s)")
+            } else if let t = MenuBarArrangement.savedOwnPosition(toggleKey),
+                      let s = MenuBarArrangement.savedOwnPosition(separatorKey),
+                      Self.isSanePair(toggle: t, separator: s) {
+                // damaged pair, but the snapshot still holds the last sane one:
+                // prefer it over the constants, which would shift the separator and
+                // silently reclassify every icon between the two positions
+                (togglePos, separatorPos) = (t, s)
+                NSLog("menubar-hide: pinned positions from snapshot toggle=\(t) separator=\(s)")
+            } else {
+                (togglePos, separatorPos) = (250, 265)
+                NSLog("menubar-hide: resetting positions to defaults (stored toggle=\(String(describing: storedToggle)) separator=\(String(describing: storedSeparator)))")
+            }
+            defaults.set(togglePos, forKey: toggleKey)
+            defaults.set(separatorPos, forKey: separatorKey)
         }
-        defaults.set(togglePos, forKey: toggleKey)
-        defaults.set(separatorPos, forKey: separatorKey)
 
         // Creation order matters on first launch: new items enter on the left,
-        // so create the chevron first (rightmost), then the separator.
+        // so create the chevron first (rightmost), then the separator. On
+        // macOS 27 the app can neither read nor seed positions and a new name
+        // always lands leftmost (measured: three fresh names from one process
+        // land right to left), so the spacers only end up between separator
+        // and chevron if all of them register fresh, in order, under new names.
+        let suffix = Self.legacyModel ? "" : "_v27"
         toggleItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        toggleItem.autosaveName = "menubarhide_toggle"
+        toggleItem.autosaveName = "menubarhide_toggle" + suffix
+        spacerItems = Self.legacyModel ? [] : (0..<CollapsedGeometry.spacerCount).map { index in
+            let spacer = NSStatusBar.system.statusItem(withLength: 0)
+            // name first: visibility is autosaved under it
+            spacer.autosaveName = "menubarhide_spacer\(index)" + suffix
+            spacer.button?.setAccessibilityElement(false) // nothing for VoiceOver to read
+            spacer.isVisible = false // keeps its slot in the layout table while taking no room
+            return spacer
+        }
         separatorItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        separatorItem.autosaveName = "menubarhide_separator"
+        separatorItem.autosaveName = "menubarhide_separator" + suffix
+        separatorGlyph = Self.symbol("number") // last stored property: self is usable below
 
         if let button = toggleItem.button {
             button.target = self
             button.action = #selector(toggleClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        separatorItem.button?.image = symbol("number")
+        separatorItem.button?.image = separatorGlyph
         separatorItem.button?.setAccessibilityLabel(String(localized: "Menu bar separator"))
 
         updateToggleIcon()
         scheduleInitialCollapse()
+
+        if !Self.legacyModel {
+            let displays = Self.displays()
+            let unit = CollapsedGeometry.unitLength(displays: displays)
+            NSLog("menubar-hide: macOS 27 menu bar model, collapse unit \(unit) with \(CollapsedGeometry.activeSpacers(unit: unit, displays: displays)) spacers")
+            // a narrower display plugged in while collapsed could put the unit past its cliff
+            screenObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.isCollapsed else { return }
+                    self.applyCollapsedGeometry(collapsed: true)
+                }
+            }
+        }
     }
 
     /// The separator must stay left of (= greater than) the chevron, and both
@@ -118,6 +163,13 @@ final class StatusBarController {
     private func scheduleInitialCollapse() {
         initialCollapseTask = Task { @MainActor [weak self] in
             guard (try? await Task.sleep(for: .milliseconds(500))) != nil else { return } // let the first layout settle
+            if !Self.legacyModel {
+                guard (try? await Task.sleep(for: Self.initialCollapseDelay)) != nil else { return }
+                guard let self, !self.isCollapsed, !Task.isCancelled else { return }
+                NSLog("menubar-hide: no per-item status windows to watch on this macOS, collapsing after a fixed delay")
+                self.collapse()
+                return
+            }
             var fingerprint = Set<String>()
             var stablePolls = 0
             for poll in 0..<Self.initialMaxPolls {
@@ -143,7 +195,9 @@ final class StatusBarController {
     }
 
     func toggle() {
-        if showInPanel, isCollapsed {
+        // the panel has nothing to capture on macOS 27: stored preference or
+        // not, the button and the hotkey work sideways there
+        if showInPanel, isCollapsed, Self.legacyModel {
             panel.isVisible ? panel.close() : openPanel()
         } else {
             isCollapsed ? expand() : collapse()
@@ -157,7 +211,7 @@ final class StatusBarController {
         captureArrangement(reason: "before collapse")
         stateWillChange()
         panel.close()
-        separatorItem.length = Self.collapsedLength
+        applyCollapsedGeometry(collapsed: true)
         isCollapsed = true
         updateToggleIcon()
     }
@@ -165,10 +219,10 @@ final class StatusBarController {
     private func expand() {
         stateWillChange()
         panel.close()
-        separatorItem.length = NSStatusItem.variableLength
+        applyCollapsedGeometry(collapsed: false)
         isCollapsed = false
         updateToggleIcon()
-        scheduleArrangementSnapshot()
+        if Self.legacyModel { scheduleArrangementSnapshot() }
     }
 
     /// Quitting while collapsed would leave every hidden icon parked off-screen
@@ -178,8 +232,45 @@ final class StatusBarController {
         guard isCollapsed else { return }
         stateWillChange()
         panel.close()
-        separatorItem.length = NSStatusItem.variableLength
+        applyCollapsedGeometry(collapsed: false)
         isCollapsed = false
+    }
+
+    /// Every length change goes through here: five call sites, one geometry.
+    private func applyCollapsedGeometry(collapsed: Bool) {
+        guard !Self.legacyModel else {
+            separatorItem.length = collapsed ? CollapsedGeometry.legacyLength : NSStatusItem.variableLength
+            return
+        }
+        let displays = Self.displays()
+        if collapsed {
+            let unit = CollapsedGeometry.unitLength(displays: displays)
+            let active = CollapsedGeometry.activeSpacers(unit: unit, displays: displays)
+            // the span stays on-screen (the bar overflows instead of sliding),
+            // so the glyph would draw in the middle of the bar
+            separatorItem.button?.image = nil
+            separatorItem.length = unit
+            for (index, spacer) in spacerItems.enumerated() {
+                spacer.isVisible = index < active
+                spacer.length = index < active ? unit : 0
+            }
+            NSLog("menubar-hide: collapsed with unit \(unit) and \(active) spacers")
+        } else {
+            for spacer in spacerItems {
+                spacer.isVisible = false
+                spacer.length = 0
+            }
+            separatorItem.length = NSStatusItem.variableLength
+            separatorItem.button?.image = separatorGlyph
+        }
+    }
+
+    /// Status area per display: right of the notch when there is one.
+    private static func displays() -> [CollapsedGeometry.Display] {
+        NSScreen.screens.map { screen in
+            CollapsedGeometry.Display(width: screen.frame.width,
+                                      statusWidth: screen.auxiliaryTopRightArea?.width)
+        }
     }
 
     /// Reads every app's stored icon position and merges it into our snapshot.
@@ -192,7 +283,7 @@ final class StatusBarController {
     /// on this too — it changes the separator length without going through
     /// expand(), so isCollapsed stays true and can't poison the snapshot.
     private func captureArrangement(reason: String) {
-        guard !isCollapsed else { return }
+        guard !isCollapsed, Self.legacyModel else { return }
         let count = MenuBarArrangement.captureAndSave()
         NSLog("menubar-hide: arrangement snapshot (\(reason)) holds \(count) positions")
     }
@@ -245,14 +336,14 @@ final class StatusBarController {
     }
 
     private func updateToggleIcon() {
-        toggleItem.button?.image = symbol(isCollapsed ? "plus" : "minus")
+        toggleItem.button?.image = Self.symbol(isCollapsed ? "plus" : "minus")
         // The +/- glyph is the only visual cue; VoiceOver needs the state in words.
         toggleItem.button?.setAccessibilityLabel(isCollapsed
             ? String(localized: "Show hidden menu bar icons")
             : String(localized: "Hide menu bar icons"))
     }
 
-    private func symbol(_ name: String) -> NSImage? {
+    private static func symbol(_ name: String) -> NSImage? {
         let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
         image?.isTemplate = true
         return image
@@ -298,14 +389,14 @@ final class StatusBarController {
                 NSLog("menubar-hide: flash-expand to capture \(windows.count - items.count) missing")
                 let captured = Set(items.map(\.id))
                 let missing = windows.filter { !captured.contains($0.id) }
-                separatorItem.length = NSStatusItem.variableLength
+                applyCollapsedGeometry(collapsed: false)
                 try? await Task.sleep(for: .milliseconds(300))
                 items += await ItemCapturer.capture(missing)
                 // a manual expand during the flash (option-click, hotkey) owns
                 // the bar now; forcing the collapsed length back would leave
                 // isCollapsed false with the icons parked off-screen, and the
                 // next snapshot would remember the parked positions
-                if isCollapsed { separatorItem.length = Self.collapsedLength }
+                if isCollapsed { applyCollapsedGeometry(collapsed: true) }
                 items.sort { $0.window.frame.minX < $1.window.frame.minX }
             }
             // a manual expand or a mode switch during the flash owns the bar
@@ -476,6 +567,16 @@ final class StatusBarController {
         panelItem.target = self
         panelItem.state = showInPanel ? .on : .off
         menu.addItem(panelItem)
+        if !Self.legacyModel {
+            // no per-item windows to capture or click and no per-app position
+            // keys to save: both features are mechanically gone on macOS 27
+            panelItem.isEnabled = false
+            panelItem.state = .off
+            let notice = NSMenuItem(title: String(localized: "Panel and Icon Arrangement need macOS 26 or earlier"),
+                                    action: nil, keyEquivalent: "")
+            notice.isEnabled = false
+            menu.addItem(notice)
+        }
 
         if !hotkeyAvailable {
             let hotkeyItem = NSMenuItem(title: String(localized: "⌃⌥H unavailable (taken by another app)"),
@@ -491,7 +592,9 @@ final class StatusBarController {
         menu.addItem(loginItem)
 
         menu.addItem(.separator())
-        menu.addItem(arrangementMenuItem())
+        let arrangement = arrangementMenuItem()
+        arrangement.isEnabled = Self.legacyModel
+        menu.addItem(arrangement)
         menu.addItem(spacingMenuItem())
 
         menu.addItem(.separator())

@@ -49,6 +49,11 @@ struct ScannerTests {
         #expect(found.map(\.id) == [2])
     }
 
+    @Test("the per-item window model ends with macOS 26", arguments: [(26, true), (27, false), (28, false)])
+    func perItemWindowModel(major: Int, expected: Bool) {
+        #expect(MenuBarItemScanner.supportsPerItemWindows(majorVersion: major) == expected)
+    }
+
     @Test("with two displays the rightmost separator copy wins")
     func rightmostSeparator() {
         let secondCopy = Self.window(7, x: -9000, width: 5016) // display to the left has its own copy

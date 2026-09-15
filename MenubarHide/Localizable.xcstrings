@@ -231,6 +231,16 @@
         }
       }
     },
+    "Panel and Icon Arrangement need macOS 26 or earlier": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Painel e Disposição dos Ícones exigem macOS 26 ou anterior"
+          }
+        }
+      }
+    },
     "Quit MenubarHide": {
       "localizations": {
         "pt-BR": {
