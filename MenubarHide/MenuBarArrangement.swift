@@ -26,7 +26,7 @@ enum MenuBarArrangement {
         var failedDomains = 0
     }
 
-    static let ownDomain = Bundle.main.bundleIdentifier ?? "com.sparrow.menubarhide"
+    static let ownDomain = Bundle.main.bundleIdentifier ?? "br.tec.sparrow.menubarhide"
 
     private static let keyPrefix = "NSStatusItem Preferred Position"
     private static let snapshotKey = "savedArrangement"

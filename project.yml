@@ -1,6 +1,6 @@
 name: MenubarHide
 options:
-  bundleIdPrefix: com.sparrow
+  bundleIdPrefix: br.tec.sparrow
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "26.0"
@@ -38,7 +38,7 @@ targets:
         buildPhase: resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sparrow.menubarhide
+        PRODUCT_BUNDLE_IDENTIFIER: br.tec.sparrow.menubarhide
         GENERATE_INFOPLIST_FILE: true
         # string catalogs: emit the localizable strings the catalog is checked against
         SWIFT_EMIT_LOC_STRINGS: "YES"
